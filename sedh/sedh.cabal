@@ -1,0 +1,102 @@
+cabal-version: 2.4
+name: sedh
+version: 0.1.0.0
+license: BSD-3-Clause
+copyright: 2020 Compl Yue
+maintainer: compl.yue@icloud.com
+author: Compl Yue
+stability: experimental
+homepage: https://github.com/e-wrks/sedh
+bug-reports: https://github.com/e-wrks/sedh/issues
+synopsis: Swarming Edh
+description:
+    Please see the README on Github at <https://github.com/e-wrks/sedh>
+category: Distributed,Network,Cluster
+build-type: Simple
+extra-source-files:
+    README.md
+
+source-repository head
+    type: git
+    location: https://github.com/e-wrks/sedh
+
+library
+    exposed-modules:
+        Language.Edh.Swarm
+    hs-source-dirs: pub
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
+                        BangPatterns TupleSections ScopedTypeVariables
+    ghc-options: -Wall
+    build-depends:
+        sedh-internal -any,
+        nedh -any,
+        edh -any,
+        lossless-decimal -any,
+        base >=4.12,
+        stm >=2.5,
+        scientific -any,
+        binary -any,
+        hashable -any,
+        unordered-containers -any,
+        containers -any,
+        unix -any,
+        time -any,
+        clock -any,
+        network -any,
+        text -any,
+        bytestring -any,
+        mtl -any,
+        transformers -any
+
+executable sedh
+    main-is: Main.hs
+    hs-source-dirs: repl
+    other-modules:
+        Repl
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
+                        BangPatterns TupleSections ScopedTypeVariables
+    ghc-options: -Wall -threaded
+    build-depends:
+        sedh -any,
+        nedh -any,
+        edh -any,
+        lossless-decimal -any,
+        base >=4.12,
+        stm >=2.5,
+        text -any,
+        bytestring -any,
+        mtl -any,
+        transformers -any
+
+library sedh-internal
+    exposed-modules:
+        Language.Edh.Swarm.Forager
+        Language.Edh.Swarm.HeadHunter
+        Language.Edh.Swarm.Worker
+        Language.Edh.Solo.BrewHere
+    hs-source-dirs: src
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
+                        BangPatterns TupleSections ScopedTypeVariables
+    ghc-options: -Wall
+    build-depends:
+        nedh -any,
+        edh -any,
+        lossless-decimal -any,
+        base >=4.12,
+        stm >=2.5,
+        scientific -any,
+        binary -any,
+        hashable -any,
+        unordered-containers -any,
+        containers -any,
+        unix -any,
+        time -any,
+        clock -any,
+        network -any,
+        text -any,
+        bytestring -any,
+        mtl -any,
+        transformers -any

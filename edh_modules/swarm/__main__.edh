@@ -1,0 +1,35 @@
+
+import * 'swarm'
+
+
+while true {  # this is the *Loop* in so-called REPL
+  # Read+Eval (console.readCommand) -> Print (console.print) -> Loop
+
+  case console.readCommand(ps1="(swarm)Đ: ", ps2="Đ| ") of {
+    batteries.quit -> { break }
+    batteries.dir -> printDir()
+    { cmdVal } -> {
+      console.print( cmdVal )
+      cmdVal = nil  # clear it
+    }
+  }
+
+} $=> {  # catch exceptions
+
+  {{ ProgramHalt: ph }} -> {
+    throw ph  # escalate a halt to the program loop of the
+    # host interpreter, let it decide what to do.
+  }
+
+  {{ IOError:exc }} -> {
+    console.fatal <| 'IO error - ' ++ exc
+    throw exc  # escalate it to the program loop of the
+    # host interpreter, let it decide what to do.
+  }
+
+  { cmdExc } -> {
+    console.print( 'Recovered from error', exception=cmdExc )
+  }
+
+}
+

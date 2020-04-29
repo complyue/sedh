@@ -96,6 +96,7 @@ library sedh-internal
         time -any,
         clock -any,
         network -any,
+        network-multicast -any,
         text -any,
         bytestring -any,
         mtl -any,

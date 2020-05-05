@@ -6,6 +6,7 @@ packages: */*.cabal
     ../nedh/nedh
     ../edh/edh
     ../edh/lossless-decimal
+    ../network
 
 -- to use a version of Edh from github
 --source-repository-package

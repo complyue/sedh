@@ -71,6 +71,8 @@ executable sedh
         transformers -any
 
 library sedh-internal
+    other-modules:
+        Language.Edh.Swarm.MC
     exposed-modules:
         Language.Edh.Swarm.Forager
         Language.Edh.Swarm.HeadHunter

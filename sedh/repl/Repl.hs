@@ -28,10 +28,10 @@ edhProgLoop !console = do
   world <- createEdhWorld console
   installEdhBatteries world
 
-  -- install batteries provided by net
+  -- install batteries provided by nedh
   installNetBatteries world
 
-  -- install batteries provided by nedh
+  -- install batteries provided by sedh
   installSwarmBatteries world
 
   -- here being the host interpreter, we loop infinite runs of the Edh

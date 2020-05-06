@@ -6,6 +6,8 @@ packages: */*.cabal
     ../nedh/nedh
     ../edh/edh
     ../edh/lossless-decimal
+
+    -- needs `setSockOpt` from master branch
     ../network
 
 -- to use a version of Edh from github

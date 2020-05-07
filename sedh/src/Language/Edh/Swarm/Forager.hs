@@ -20,14 +20,13 @@ import qualified Data.HashMap.Strict           as Map
 import           Data.Dynamic
 
 import           Network.Socket
+import           Network.Socket.ByteString
 
 import qualified Data.Lossless.Decimal         as D
 
 import           Language.Edh.EHI
 
 import           Language.Edh.Net
-
-import           Language.Edh.Swarm.MC
 
 
 isMultiCastAddr :: AddrInfo -> Bool
@@ -263,7 +262,7 @@ foragerCtor !peerClass !pgsCtor !apk !obs !ctorExit =
         _ <- atomically $ readTMVar forageEoL
         killThread forageThId
       addr <- resolveServAddr
-      bracket (open addr) close acceptClients
+      bracket (open addr) close forageFrom
    where
     ctx             = edh'context pgsCtor
     world           = contextWorld ctx
@@ -279,22 +278,27 @@ foragerCtor !peerClass !pgsCtor !apk !obs !ctorExit =
       if isMultiCastAddr addr
         then do
           setSocketOption sock ReuseAddr 1
-          setSocketOption sock ReusePort 1
-          -- setSockOpt sock (SockOpt _IPPROTO_IP _IP_ADD_MEMBERSHIP) ""
-
-          bind sock (addrAddress addr)
-        else do
-          bind sock (addrAddress addr)
-
-      listen sock 30 -- todo make this tunable ?
+          -- setSocketOption sock ReusePort 1
+          -- todo support mcast 
+          --   for now `setSockOpt` is not released yet, 
+          --   HIE ceases to render a project with .hsc files,
+          --   not a good time to get it straight.
+          -- setSockOpt sock (SockOpt _IPPROTO_IP _IP_ADD_MEMBERSHIP) xxx
+          -- bind sock (addrAddress addr)
+          error "mcast not supported yet"
+        else -- receiving unicast to the specified addr
+             bind sock (addrAddress addr)
       atomically
         $   fromMaybe []
         <$> tryTakeTMVar forageAddrs
         >>= putTMVar forageAddrs
         .   (addr :)
       return sock
-    acceptClients :: Socket -> IO ()
-    acceptClients sock = do
+    forageFrom :: Socket -> IO ()
+    forageFrom !sock = do
+      (payload, wsAddr) <- recvFrom sock
+      -- don't expect too large a call-for-workers announcement
+                                    1500
       (conn, addr) <- accept sock
 
       hndl         <- socketToHandle conn ReadWriteMode
@@ -305,7 +309,7 @@ foragerCtor !peerClass !pgsCtor !apk !obs !ctorExit =
         . atomically
         . tryPutTMVar clientEoL
 
-      acceptClients sock -- tail recursion
+      forageFrom sock -- tail recursion
 
     servClient :: TMVar (Either SomeException ()) -> Text -> Handle -> IO ()
     servClient !clientEoL !clientId !hndl = do

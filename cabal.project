@@ -7,9 +7,6 @@ packages: */*.cabal
     ../edh/edh
     ../edh/lossless-decimal
 
-    -- needs `setSockOpt` from master branch
-    ../network
-
 -- to use a version of Edh from github
 --source-repository-package
 --    type: git

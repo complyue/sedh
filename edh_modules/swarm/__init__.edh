@@ -1,6 +1,10 @@
 
-# re-export artifacts from these host modules
+export {
+
 import * 'swarm/RT'
 
-# re-export artifacts from these submodules
 import * './options'
+import * './forager'
+import * './headhunter'
+
+}

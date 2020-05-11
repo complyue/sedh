@@ -5,7 +5,7 @@
 
 import * 'swarm'
 
-method forageOn(
+export method forageOn(
   swarmAddr    = '237.3.7.21',    # local addr to listen for call-for-workers
   swarmPort    = 3722,            # local port to listen for call-for-workers
   init         = None,            # peer module initialization

@@ -1,0 +1,33 @@
+
+{#
+ # forager for a swarm node
+ #}
+
+import * 'swarm'
+
+export method forageOn (
+  swarmAddr    = '0.0.0.0',  # local addr to sniff for call-for-workers
+  swarmPort    = 3722,       # local port to sniff for call-for-workers
+  init         = None,       # sniffer module initialization
+  foragerModu  = __name__,   # the forager reacting module
+) {
+
+  case Sniffer(
+    # sniffer module
+    foragerModu,
+    # addr/port to sniff on
+    swarmAddr, swarmPort,
+    # sniffer module initializer
+    init = init,
+  ) of { sniffer } -> { pass }
+
+  case sniffer.addrs() of {
+    { addr =>_ } -> console.info<| 'Foraging at: ' ++ addr
+    # or the network has failed, propagate the error
+    sniffer.join()  # this usually throws
+    # in case join() didn't throw, report this error
+    error('Forager failed listening.')
+  }
+
+  return sniffer
+}

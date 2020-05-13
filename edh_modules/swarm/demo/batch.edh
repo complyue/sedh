@@ -1,0 +1,36 @@
+#
+# Demonstrate a simple, batch based, parallel work definition,
+# for a swarm to compute.
+#
+
+
+# (hyper) parameters and their default values to be worked on 
+
+# import parameters from a module serving edit-to-config purpose
+import * './etc'
+
+# some other parameters
+let (m, n) = (3, 7)
+
+
+{#
+ # this is the actual computation to be done,
+ # one ips (instantiated parameter set) a time.
+ #
+ # such a procedure usually uses a wild arguments receiver,
+ # taking the incoming ips (of dict/apk type) sent as calling
+ # arguments like (**ips), so arbitrary parameters can be
+ # overridden, with defaults from outer module scope.
+ #}
+method compute * {
+
+  r = m * n
+
+  # simulate computation time cost, each taking 3 seconds.
+  for ts from console.everySeconds(3) do { break }
+
+  return pkargs(
+    r=r, ts=ts,
+  )
+}
+

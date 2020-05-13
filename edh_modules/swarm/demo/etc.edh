@@ -1,0 +1,13 @@
+
+{
+
+  export {
+    m_range = ()=< for m from range(5, 10) do m
+    n_range = ()=< for n from range(3, 8) do n
+  }
+
+  export method exclude(m, n) {
+    abs(m - n) <= 2
+  }
+
+}

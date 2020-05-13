@@ -1,0 +1,12 @@
+
+# this is an entry module (i.e. __main__.edh), not registered
+# to the Edh world and not importable.
+#
+# while '{parent-dir}.edh' or '{parent-dir}/__init__.edh' can
+# be a persistent module with a single instance loaded & shared
+# among the world. the following import is to get everything
+# exported from that module.
+import * '.'
+
+
+shellHere()

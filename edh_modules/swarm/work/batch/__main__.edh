@@ -1,0 +1,31 @@
+#
+# Swarm batch worker process entry module
+#
+
+import * 'net'
+
+
+method performWork(workDefi) {
+  extends {
+    import (**_) workDef
+  } of { workModu } -> { pass }
+  
+  chJob := 'job'
+
+  producer jobPump(outlet) {
+    peer.postCommand(expr {
+
+while false == peer.eol {
+  case nextJob({$ $}) of { ips } -> {
+    peer.p2c({$ chJob $}, repr(ips))
+  }
+}
+
+    })
+  }
+
+  for ips from jobPump(outlet=peer.armChannel(chJob)) do {
+
+  }
+
+}

@@ -8,5 +8,8 @@
 # exported from that module.
 import * '.'
 
+# inherit from the abstract, batch definition module
+extends { import (**_) 'swarm/wdef/batch' }
+
 
 shellHere()

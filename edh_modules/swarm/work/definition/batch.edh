@@ -1,0 +1,11 @@
+#
+# Swarm batch work definition
+#
+
+# inherit from the abstract, base definition module
+extends { import (**_) './base' }
+
+
+method talkToSource() {
+  that.peer.p2c(xxx, expr rrr())
+}

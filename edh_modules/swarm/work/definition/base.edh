@@ -1,0 +1,10 @@
+#
+# This is the base module for swarm work definition
+#
+
+
+export method Retire () {
+}
+
+export method StatMemory () {
+}

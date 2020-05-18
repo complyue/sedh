@@ -6,6 +6,41 @@
 extends { import (**_) './base' }
 
 
-method talkToSource() {
-  that.peer.p2c(xxx, expr rrr())
+method talkToSource(peer) {
+
+  chJob = 'job'
+
+  producer jobPump(outlet) {
+    peer.postCommand(expr {
+
+{
+  resultSink = peer.armChannel({$ chJob $})
+  resultSink <- None
+  ips = None
+  for result from resultSink do {
+    if false != peer.eol() then { break }
+    case nextJob(ips, result) of { ips } -> {
+      peer.p2c({$ chJob $}, repr(ips))
+    }
+  }
+} @=> {
+  peer.p2c({$ chJob $}, nil)  # mark eos finally
 }
+
+    })
+  }
+
+  for ips from jobPump(outlet=peer.armChannel(chJob)) do {
+    case compute(**ips) of { result } -> {
+      peer.p2c({$ chJob $}, repr(result))
+    }
+  }
+
+}
+
+
+method manageWorkers() {
+  for ips from iterateParams() do 
+    ...
+}
+

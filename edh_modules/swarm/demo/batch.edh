@@ -34,3 +34,14 @@ method compute * {
   )
 }
 
+
+generator iterateParams() {
+  for m from m_range do 
+    for n from n_range do 
+      if exclude(m, n) then continue
+      yield pkargs( m=m, n=n, )
+}
+
+
+method allParamsDone() pass
+

@@ -3,8 +3,8 @@
 #
 
 
-export method Retire () {
+method Retire () {
 }
 
-export method StatMemory () {
+method StatMemory () {
 }

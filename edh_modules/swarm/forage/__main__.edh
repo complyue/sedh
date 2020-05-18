@@ -1,9 +1,0 @@
-
-method WorkToDo(
-  role,
-  target,
-  hc_planned,
-  priority = 0,
-) {
-
-}

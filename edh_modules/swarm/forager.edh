@@ -5,12 +5,18 @@
 
 import * 'swarm'
 
+
 export method forageOn (
+  headcount    = 1,          # number of worker processes to vend
+  targetPrefix = '',         # prefix to filter out uninteresting work
   swarmAddr    = '0.0.0.0',  # local addr to sniff for call-for-workers
   swarmPort    = 3722,       # local port to sniff for call-for-workers
-  init         = None,       # sniffer module initialization
   foragerModu  = __name__,   # the forager reacting module
 ) {
+  method __forager_init__() {
+    that.headcount = headcount
+    that.targetPrefix = targetPrefix
+  }
 
   case Sniffer(
     # sniffer module
@@ -18,7 +24,7 @@ export method forageOn (
     # addr/port to sniff on
     swarmAddr, swarmPort,
     # sniffer module initializer
-    init = init,
+    init = __forager_init__,
   ) of { sniffer } -> { pass }
 
   case sniffer.addrs() of {

@@ -9,7 +9,7 @@
 import * '.'
 
 # inherit from the abstract, batch definition module
-extends { import (**_) 'swarm/wdef/batch' }
+extends { import (**_) 'swarm/work/definition/batch' }
 
 
 shellHere()

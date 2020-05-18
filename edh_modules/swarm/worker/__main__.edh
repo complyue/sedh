@@ -1,0 +1,14 @@
+#
+# Swarm batch worker process entry module
+#
+
+# should have been implanted by host module preparation
+peer := 'Peer'
+
+method performWork(workDefModu) {
+  extends {
+    import (**_) workDefModu
+  }
+
+  this.talkToSource(peer)
+}

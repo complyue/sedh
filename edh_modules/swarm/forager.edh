@@ -3,7 +3,7 @@
  # forager for a swarm node
  #}
 
-import * 'swarm'
+import * 'net'
 
 
 export method forageOn (

@@ -34,15 +34,15 @@ targetPrefix ?:= ''
 method WorkToDo(
   hcPlanned,     # planned headcount to recruit
   executable,    # executable file path to launch as worker processes
-  target = '',   # for prefix based filtering of uninteresting work
   priority = 0,  # used to prioritize allocation of work heads
+  target = '',   # for prefix based filtering of uninteresting work
 ) {
   case target of {
     { targetPrefix >@ _ } -> { pass }
     return nil  # filtered out by prefix
   }
 
-  manageWorkToDo(
+  negotiateWorkToDo(
     addr,
     hcPlanned, executable, priority,
   )

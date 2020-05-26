@@ -1,3 +1,175 @@
 
 import * 'net'
 
+import * 'swarm/RT'
+
+
+class HeadHunter {
+
+  # fetch effective configurations, cache as instance attribute
+  priority = perform priority
+  headcount = perform headcount
+
+  class Forager {
+    hcEmployed = None
+    hcWorking = 0
+    method __init__(
+      peer as this.peer, pid as this.pid,
+      maxHC as this.maxHC,
+    ) pass
+  }
+
+  class Worker {
+    method __init__(peer as this.peer) {
+      this.datas = perform @dataSink
+    }
+  }
+
+  # a swarm node connection identifying itself as a forager
+  method OfferHeads(
+    foragerPid, maxHC, 
+  ) {
+    ai {  # calculate number of employment atomically
+      hcDemand = this.headcount - this.hcEmployed
+      hcToEmploy = min(maxHC, hcDemand)
+      if hcToEmploy >= 1
+        then this.hcEmployed += hcToEmploy
+    }
+    hcToEmploy < 1 -> {  # no demand, disconnect
+      # todo send zero employment ?
+      that.peer.stop()
+    }
+    # employ heads from this forager
+    ai case this.foragers[that.peer] of {
+      nil -> this.foragers[that.peer] = (forager = Forager(
+        that.peer, foragerPid, maxHC,
+      ))
+      { forager } -> {
+        # update max headcount it is able to provide
+        forager.maxHC = maxHC
+      }
+    }
+    that.peer.p2c(dataChan, repr(
+      # todo could this possibily exceed its maxHC ?
+      forager.hcEmployed += hcToEmploy
+    ))
+  }
+
+  # a swarm node connection identifying itself as a worker
+  method StartWorking(
+    workerPid, foragerPid,
+  ) {
+    this.newWorkers <- Worker(that.peer) => this.idleWorkers
+  }
+
+  method __swarm_conn_init__() {
+    that.OfferHeads = OfferHeads
+    that.StartWorking = StartWorking
+  }
+
+  case Server (
+    'swarm/headhunter',  # the service module
+    '0.0.0.0',           # local addr to bind
+    0,                   # local port to bind
+    # per-connection peer module initialization
+    init=__swarm_conn_init__,
+  ) of { server } -> {
+    case server.addrs() of {
+      { addr =>_ } -> console.info<| 'HeadHunter listening: ' ++ addr
+      # or the network has failed, propagate the error
+      server.join()  # this usually throws
+      # in case join() didn't throw, report this error
+      error('HeadHunter failed listening.')
+    }
+  }
+
+  # call-for-workers advertiser
+  case Advertiser(
+    # target swarm address
+    perform swarmAddr, perform swarmPort,
+  ) of { cfw } -> { pass }
+
+  # data structures for job scheduling
+  hcEmployed = 0
+  foragers = {}
+  newWorkers = sink
+  idleWorkers = []
+  pendingJobs = []
+
+  method __init__( resultSink as this.resultSink ) pass
+
+  method trackJob(worker, ips) {
+    dataSink = worker.peer.armedChannel(dataChan)
+    perceive worker.peer.armedChannel(errChan) { jobExc } -> {
+      # mark local data chan eos, avoid stm dead lock due to the for loop
+      dataSink <- nil
+      worker.peer.stop() # disconnect on error
+      case perform @shouldRetryJob of {
+        false -> { pass }
+        true -> ips => this.pendingJobs
+        { retryChk } -> case retryChk( jobExc, ips ) -> { newIPS } ->
+          newIPS => this.pendingJobs
+        }
+      }
+    }
+    producer submitJob(outlet) {
+      worker.peer.p2c(dataChan, repr(ips))
+    }
+    for result from submitJob(outlet=dataSink) do {
+      this.resultSink <- (ips, result)
+      this.newWorkers <- worker => this.idleWorkers
+    }
+  }
+
+  method submitJobs() {
+    while true {
+      ai case this.pendingJobs of {
+        { ips => pendingJobs } ->
+          this.pendingJobs = pendingJobs
+        return nil  # no more pending jobs
+      }
+
+      while true {
+        ai case this.idleWorkers of {
+          { worker => idleWorkers} ->
+            this.idleWorkers = idleWorkers
+          worker = None
+        }
+        worker != None -> {
+          go trackJob(worker, ips)
+        }
+
+        # calibrate this.hcEmployed, wrt forager disconnection etc.
+        hcEmployed = 0
+        for (peer, forager) from this.foragers do {
+          if false != peer.eol() {
+            this.foragers[peer] = nil  # forget it
+          }
+          hcEmployed += forager.hcEmployed
+        }
+        this.hcEmployed = hcEmployed
+
+        # advertise call-for-workers if there's demand
+        (hcDemand = this.headcount - this.hcEmployed) > 0
+        &> cfw.post(expr
+
+WorkToDo(
+  {$ hcDemand $},
+  {$ jobExecutable $},
+  {$ priority $},
+)
+
+        )
+        # wait until new idle workers appear
+        for _ from this.newWorkers do 
+          if not null(this.idleWorkers) then { break }
+      }
+    }
+  }
+
+  method dispatchJob(ips) {
+    ips => this.pendingJobs
+    this.submitJobs()
+  }
+
+}

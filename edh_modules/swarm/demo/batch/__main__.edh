@@ -1,15 +1,35 @@
 
-# this is an entry module (i.e. __main__.edh), not registered
-# to the Edh world and not importable.
+# this is an entry moduel to hook up some worker nodes
+# from the swarm, to accomplish the work defined in some
+# module, with arbitrary overrides possible from this
+# module
+
+# import reusable work definition from some module, don't
+# put too much logic in this entry module, an entry module
+# should just like a comprehensive command line, don't 
+# program the command line, or you are going to repeat
+# yourself in duplicating works in such entry modules
+import * 'swarm/demo/batch'
+
+# target swarm address
+effect swarmAddr = '255.255.255.255'
+effect swarmPort = 3722
+
+# control work priority and maximum number of worker nodes we
+# hire from the swarm
+effect priority = 0
+effect headcount = 10
+
+# exported to override what's in the definition module scope,
+# serving as lexical default values to `manageThisWork()`
 #
-# while '{parent-dir}.edh' or '{parent-dir}/__init__.edh' can
-# be a persistent module with a single instance loaded & shared
-# among the world. the following import is to get everything
-# exported from that module.
-import * '.'
+# see: `**__exports__` passed to `manageThisWork()` below
+export generator m_range() {
+  for m from range(7, 9) do yield m
+}
 
-# inherit from the abstract, batch definition module
-extends { import (**_) 'swarm/work/definition/batch' }
-
-
-shellHere()
+# we can arbitrarily override artifacts for `manageThisWork()`
+# with whatever exported from this module, i.e. `__exports__`,
+# those will shadow what's in its lexical module global scope,
+# including those imported from './etc' and elsewhere
+manageThisWork (**__exports__)

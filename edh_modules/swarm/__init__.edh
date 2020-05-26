@@ -3,4 +3,6 @@ export {
 
   import * './symbols'
 
+  import * './work/batch'
+
 }

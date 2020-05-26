@@ -3,28 +3,53 @@
 # for a swarm to compute.
 #
 
+# re-export swarm symbols so entry modules can simply do
+#  `import * '.'`
+export import * 'swarm'
+
+
+# this computation procedure is put here for simplicity of
+# demonstration, many of such procedures should be imported
+# from modular libraries instead, likely with unique symbols
+# provided by those libraries to avoid naming clash.
+method computeIt(z) {
+  # expecting an effectful value identified by attribute
+  # name `c` on call stack
+  r = perform c * z
+
+  return r
+}
+
 
 # (hyper) parameters and their default values to be worked on 
 
 # import parameters from a module serving edit-to-config purpose
 import * './etc'
 
-# some other parameters
+# more parameters with their default values
 let (m, n) = (3, 7)
 
-
 {#
- # this is the actual computation to be done,
- # one ips (instantiated parameter set) a time.
+ # this is the job entry for each one particular ips (instantiated
+ # parameter set) to be worked out by a swarm worker process
  #
- # such a procedure usually uses a wild arguments receiver,
- # taking the incoming ips (of dict/apk type) sent as calling
- # arguments like (**ips), so arbitrary parameters can be
- # overridden, with defaults from outer module scope.
+ # such a procedure usually uses a wild arguments receiver, so
+ # arbitrary parameters can be overridden, with defaults from the
+ # module scope out here.
  #}
-method compute * {
-
-  r = m * n
+export method @doOneJob * {
+  # put c into effect namespace and call an effectful computation
+  # procedure expecting it.
+  #
+  # this is not obvious a right move if `computeIt` is tightly
+  # coupled with this package, please imagine some `computeIt`
+  # is actually imported from other modular libraries/frameworks.
+  #
+  # in large scale modular libraries/frameworks, they should further
+  # define their own symbols used to identify the expected effects,
+  # instead of the alphanumeric name `c` as demonstrated here.
+  effect c = m + n
+  r = computeIt(m * n)
 
   # simulate computation time cost, each taking 3 seconds.
   for ts from console.everySeconds(3) do { break }
@@ -35,13 +60,24 @@ method compute * {
 }
 
 
-generator iterateParams() {
-  for m from m_range do 
-    for n from n_range do 
-      if exclude(m, n) then continue
-      yield pkargs( m=m, n=n, )
+export method manageThisWork * {
+
+  # log and retry on job failure
+  effect method @shouldRetryJob (jobExc, ips) {
+    console.error<| 'Job failed: ' ++ jobExc
+    return ips  # retry the same job
+  }
+
+  generator iterParams() {
+    for m from m_range() do 
+    for n from n_range() do
+    not exclude(m, n) ->
+    yield pkargs( m=m, n=n, )
+  }
+
+  for (ips, result) from manageBatchJobs( iterParams ) do {
+    console.print('Job computed.', ips=ips, result=result,)
+  }
+
+  console.print('All done.')
 }
-
-
-method allParamsDone() pass
-

@@ -1,0 +1,41 @@
+
+{#
+ # this is the forager/worker-facing entry module of a headhunter
+ #}
+
+import (Peer, **_) 'net/RT'
+import * 'net/symbols'
+effect import * 'net/effects'
+
+
+# expose service procedures exported from the persistent module
+import * '.'
+
+
+peer ?:= Peer()
+console.info<| 'Swarm forager/worker connected - ' ++ peer
+
+
+effect {
+  ;@netPeer = peer
+  ;@dataSink = peer.armChannel(dataChan)
+}
+
+
+{
+
+  while false == peer.eol() case peer.readCommand() of {
+    # note a command resulting in nil is ignored here
+    { cmdVal } -> {
+      console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
+      cmdVal = nil  # clear it
+    }
+  }
+
+} @=> {
+  { exc } -> {
+    console.error<| 'Disconnecting swarm forager/worker ' ++ peer
+      ++ ' for error: ' ++ exc
+  }
+  console.info<| 'Disconnecting swarm forager/worker ' ++ peer
+}

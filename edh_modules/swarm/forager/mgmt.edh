@@ -1,0 +1,10 @@
+
+
+export method negotiateWorkToDo(
+  workSourceAddr,
+  hcPlanned,     # planned headcount to recruit
+  executable,    # executable file path to launch as worker processes
+  priority = 0,  # used to prioritize allocation of work heads
+) {
+
+}

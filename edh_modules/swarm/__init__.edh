@@ -1,10 +1,6 @@
 
 export {
 
-import * 'swarm/RT'
-
-import * './options'
-import * './forager'
-import * './headhunter'
+  import * './symbols'
 
 }

@@ -1,9 +1,36 @@
 
-# following artifacts should have been implanted by host module preparation
-headcount ?:= 1
+# this is the network facing entry module, specifiying
+# reactions by exposing procedures, to host command packets
+# casted (broadcast, multicast, unicast) to the address a
+# sniffer is configured to sniff
+
+import * './mgmt'
+
+
+import (Addr, **_) 'net'
+
+# mocking artifacts those should have been implanted by host
+# module preparation, to give meaningful information to IDEs
+# and/or other tools, for purpose of, e.g. auto completion.
+false -> {  # this block is impossible to run
+
+  # sniff another command from the network
+  method sniff() { pass }
+
+  # check end-of-life of the sniffer
+  method eol() return true
+
+}
+
+# source address of the sniffed command packet, updated each
+# time a packet is sniffed and executed as command
+addr := Addr()
+
+
+# following should have been implanted by host module initialization
 targetPrefix ?:= ''
 
-
+# A work source (e.g. a head hunter) should invoke this as a command
 method WorkToDo(
   hcPlanned,     # planned headcount to recruit
   executable,    # executable file path to launch as worker processes
@@ -15,4 +42,21 @@ method WorkToDo(
     return nil  # filtered out by prefix
   }
 
+  manageWorkToDo(
+    addr,
+    hcPlanned, executable, priority,
+  )
+}
+
+
+# loop forever until eol on error, or stopped elsewhere
+while false == eol() {
+
+  # note nil result from `sniff()` is silently ignored
+  case sniff() of { cmdVal } -> {
+    console.info<| 'Sniffed cmd:\n  ' ++ cmdVal
+  }
+
+} $=> { exc } -> {
+  console.error<| 'Error sniffing: ' ++ exc
 }

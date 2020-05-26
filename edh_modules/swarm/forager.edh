@@ -14,7 +14,6 @@ export method forageOn (
   foragerModu  = __name__,   # the forager reacting module
 ) {
   method __forager_init__() {
-    that.headcount = headcount
     that.targetPrefix = targetPrefix
   }
 
@@ -32,7 +31,7 @@ export method forageOn (
     # or the network has failed, propagate the error
     sniffer.join()  # this usually throws
     # in case join() didn't throw, report this error
-    error('Forager failed listening.')
+    error('Forager failed sniffing.')
   }
 
   return sniffer

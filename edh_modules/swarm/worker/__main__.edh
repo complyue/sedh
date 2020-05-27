@@ -34,6 +34,7 @@ StartWorking({$ swarmWorkerPid $}, {$ swarmManagerPid $})
 }
 
 for ips from initiateJobs( outlet=peer.armChannel(dataChan) )
+# apks are expected to be posted to a worker's data channel, one by one
 do case this.@doOneJob(***ips) of {
   { result } -> {
     peer.p2c(dataChan, repr(result))

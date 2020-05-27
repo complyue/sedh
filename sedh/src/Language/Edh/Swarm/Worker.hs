@@ -149,7 +149,7 @@ clientCtor !addrClass !peerClass !pgsCtor !apk !obs !ctorExit =
           . tryPutTMVar cnsmrEoL
           )
         )
-      $ \_ -> ctorExit $ toDyn client
+      $ \_ -> contEdhSTM $ ctorExit $ toDyn client
   parseCtorArgs =
     ArgsPackParser
         [ \arg (_, addr', init') -> case edhUltimate arg of
@@ -224,7 +224,9 @@ clientCtor !addrClass !peerClass !pgsCtor !apk !obs !ctorExit =
           throwEdhSTM pgs UsageError $ "bug: this is not a client : " <> T.pack
             (show esd)
         Just !client ->
-          waitEdhSTM pgs (readTMVar $ edh'service'addrs client) $ wrapAddrs []
+          edhPerformSTM pgs (readTMVar $ edh'service'addrs client)
+            $ contEdhSTM
+            . wrapAddrs []
 
   eolProc :: EdhProcedure
   eolProc _ !exit = do
@@ -258,8 +260,9 @@ clientCtor !addrClass !peerClass !pgsCtor !apk !obs !ctorExit =
         Just !client ->
           edhPerformIO pgs (atomically $ readTMVar (edh'consumer'eol client))
             $ \case
-                Left  e  -> toEdhError pgs e $ \exv -> edhThrowSTM pgs exv
-                Right () -> exitEdhSTM pgs exit nil
+                Left e ->
+                  contEdhSTM $ toEdhError pgs e $ \exv -> edhThrowSTM pgs exv
+                Right () -> exitEdhProc exit nil
 
   stopProc :: EdhProcedure
   stopProc _ !exit = do

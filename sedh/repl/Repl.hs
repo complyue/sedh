@@ -22,17 +22,18 @@ consoleModule = "swarm"
 -- | Manage lifecycle of Edh programs during the repl session
 edhProgLoop :: EdhConsole -> IO ()
 edhProgLoop !console = do
+  starter <- determineSwarmWorkStarter
 
   -- create the world, we always work with this world no matter how
   -- many times the Edh programs crash
-  world <- createEdhWorld console
+  world   <- createEdhWorld console
   installEdhBatteries world
 
   -- install batteries provided by nedh
   installNetBatteries world
 
   -- install batteries provided by sedh
-  installSwarmBatteries world
+  installSwarmBatteries starter world
 
   -- here being the host interpreter, we loop infinite runs of the Edh
   -- console REPL program, unless cleanly shutdown, for resilience

@@ -72,10 +72,8 @@ executable sedh
 
 library sedh-internal
     exposed-modules:
-        Language.Edh.Swarm.Forager
-        Language.Edh.Swarm.HeadHunter
+        Language.Edh.Swarm.Starter
         Language.Edh.Swarm.Worker
-        Language.Edh.Solo.BrewHere
     hs-source-dirs: src
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
@@ -94,6 +92,7 @@ library sedh-internal
         unordered-containers -any,
         containers -any,
         unix -any,
+        directory -any,
         time -any,
         clock -any,
         text -any,

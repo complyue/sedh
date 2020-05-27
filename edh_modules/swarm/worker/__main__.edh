@@ -2,13 +2,47 @@
 # Swarm batch worker process entry module
 #
 
-# should have been implanted by host module preparation
-peer := 'Peer'
+import * 'net'
+import * 'swarm/symbols'
 
-method performWork(workDefModu) {
-  extends {
-    import (**_) workDefModu
+import (
+  jobWorkModu, swarmManagerPid, swarmWorkerPid,
+**_) 'swarm/RT'
+
+
+# this should have been implanted by host module initialization, mention it
+# here for purpose of e.g. IDE code completion
+#
+# peer is connected to a work source (e.g. a headhunter)
+peer ?:= Peer()
+
+
+# inherit the work module, so we have access to `@doOneJob` implemented there
+extends {
+  import (**_) jobWorkModu
+}
+
+
+# identify this connection as swarm worker to the headhunter, then it will
+# start sending ips to our data channel
+producer initiateJobs(outlet) {
+  peer.postCommand(expr
+
+StartWorking({$ swarmWorkerPid $}, {$ swarmManagerPid $})
+
+  )
+}
+
+for ips from initiateJobs( outlet=peer.armChannel(dataChan) )
+do case this.@doOneJob(***ips) of {
+  { result } -> {
+    peer.p2c(dataChan, repr(result))
   }
-
-  this.talkToSource(peer)
+  throw UsageError('Swarm job returned no result', ips=ips)
+} $=> { jobExc } -> {
+  console.error<| 'Swarm job [' ++ jobWorkModu ++ ' - [' 
+    ++ swarmManagerPid ++ '/' ++ swarmWorkerPid, '] failure:\n'
+    ++ jobExc
+  peer.p2c(errChan, repr(jobExc))
+  break
 }

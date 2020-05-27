@@ -59,7 +59,7 @@ class HeadHunter {
   method StartWorking(
     workerPid, foragerPid,
   ) {
-    this.newWorkers <- Worker(that.peer) => this.idleWorkers
+    this.workerAvailable <- Worker(that.peer) => this.idleWorkers
   }
 
   method __swarm_conn_init__() {
@@ -92,32 +92,51 @@ class HeadHunter {
   # data structures for job scheduling
   hcEmployed = 0
   foragers = {}
-  newWorkers = sink
+  workerAvailable = sink
   idleWorkers = []
   pendingJobs = []
 
   method __init__( resultSink as this.resultSink ) pass
 
   method trackJob(worker, ips) {
-    dataSink = worker.peer.armedChannel(dataChan)
-    perceive worker.peer.armedChannel(errChan) { jobExc } -> {
-      # mark local data chan eos, avoid stm dead lock due to the for loop
+    # arm new private data/err channels to this job
+    dataSink = worker.peer.armChannel(dataChan)
+    errSink = worker.peer.armChannel(errChan)
+    # convert disconnection without result to error
+    go {
+      worker.peer.join() $=> {
+        { discExc } -> { pass }
+        discExc = None
+      }
+      case mre(dataSink) of nil ->
+      errSink <- discExc |>
+        PeerError('Swarm worker disconnected unexpectedly')
+    }
+    # perform retry effect on error
+    perceive errSink { jobExc } -> {
+      # mark local data chan eos, for there's an stm dead lock to avoid,
+      # due to the for loop
       dataSink <- nil
+
       worker.peer.stop() # disconnect on error
+
       case perform @shouldRetryJob of {
         false -> { pass }
         true -> ips => this.pendingJobs
-        { retryChk } -> case retryChk( jobExc, ips ) -> { newIPS } ->
+        { retryChk } -> case retryChk( jobExc, ips ) of { newIPS } -> {
           newIPS => this.pendingJobs
         }
       }
+      break  # terminate this thread
     }
+    # submit ips and process result
     producer submitJob(outlet) {
       worker.peer.p2c(dataChan, repr(ips))
     }
     for result from submitJob(outlet=dataSink) do {
       this.resultSink <- (ips, result)
-      this.newWorkers <- worker => this.idleWorkers
+      this.workerAvailable <- worker => this.idleWorkers
+      break  # one ips at a time
     }
   }
 
@@ -136,13 +155,14 @@ class HeadHunter {
           worker = None
         }
         worker != None -> {
+          # start asynchronous concurrency
           go trackJob(worker, ips)
         }
 
         # calibrate this.hcEmployed, wrt forager disconnection etc.
         hcEmployed = 0
         for (peer, forager) from this.foragers do {
-          if false != peer.eol() {
+          if false != peer.eol() then {
             this.foragers[peer] = nil  # forget it
           }
           hcEmployed += forager.hcEmployed
@@ -150,8 +170,8 @@ class HeadHunter {
         this.hcEmployed = hcEmployed
 
         # advertise call-for-workers if there's demand
-        (hcDemand = this.headcount - this.hcEmployed) > 0
-        &> cfw.post(expr
+        if (hcDemand = this.headcount - this.hcEmployed) > 0
+        then cfw.post(expr
 
 WorkToDo(
   {$ hcDemand $},
@@ -159,10 +179,10 @@ WorkToDo(
   {$ priority $},
 )
 
-        )
+          )
         # wait until new idle workers appear
-        for _ from this.newWorkers do 
-          if not null(this.idleWorkers) then { break }
+        for _ from this.workerAvailable do
+        if not null(this.idleWorkers) then { break }
       }
     }
   }

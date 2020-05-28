@@ -67,8 +67,8 @@ startSwarmWork = do
     determineSwarmWorkStarter
 
   console <- defaultEdhConsole defaultEdhConsoleSettings
-  let consoleOut      = writeTQueue (consoleIO console) . ConsoleOut
-      consoleShutdown = writeTQueue (consoleIO console) ConsoleShutdown
+  let consoleOut      = writeTBQueue (consoleIO console) . ConsoleOut
+      consoleShutdown = writeTBQueue (consoleIO console) ConsoleShutdown
 
       workProg :: IO ()
       workProg = do
@@ -127,7 +127,7 @@ startSwarmWork = do
         atomically $ consoleOut $ "💥 " <> T.pack (show e)
       Right _ -> pure ()
     -- shutdown console IO anyway
-    atomically $ writeTQueue (consoleIO console) ConsoleShutdown
+    atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
 
   atomically $ if wscFd == 0
     then

@@ -9,9 +9,6 @@ import           Control.Concurrent.STM
 import qualified Data.Text                     as T
 
 import           Language.Edh.EHI
-import           Language.Edh.Net
-
-import           Language.Edh.Swarm
 
 
 -- the Edh module name to be run as the console
@@ -20,20 +17,13 @@ consoleModule = "swarm"
 
 
 -- | Manage lifecycle of Edh programs during the repl session
-edhProgLoop :: EdhConsole -> IO ()
-edhProgLoop !console = do
-  starter <- determineSwarmWorkStarter
-
-  -- create the world, we always work with this world no matter how
-  -- many times the Edh programs crash
-  world   <- createEdhWorld console
-  installEdhBatteries world
-
-  -- install batteries provided by nedh
-  installNetBatteries world
-
-  -- install batteries provided by sedh
-  installSwarmBatteries starter world
+swarmRepl :: EdhConsole -> EdhWorld -> IO ()
+swarmRepl !console !world = do
+  atomically $ do
+    consoleOut ">> Get Work Done - by an Edh swarm <<\n"
+    consoleOut
+      "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
+    consoleOut "  https://github.com/e-wrks/sedh/tree/master/Tour\n"
 
   -- here being the host interpreter, we loop infinite runs of the Edh
   -- console REPL program, unless cleanly shutdown, for resilience
@@ -53,11 +43,9 @@ edhProgLoop !console = do
               consoleOut "🐴🐴🐯🐯\n"
             doneRightOrRebirth
           Right !phv -> case edhUltimate phv of
-            EdhNil -> atomically $ do
               -- clean program halt, all done
-              consoleOut "Well done, bye.\n"
-              consoleShutdown
-            _ -> do -- unclean program exit
+            EdhNil -> atomically $ consoleOut "Well done, bye.\n"
+            _      -> do -- unclean program exit
               atomically $ do
                 consoleOut "Your program halted with a result:\n"
                 consoleOut $ (<> "\n") $ case phv of
@@ -69,6 +57,4 @@ edhProgLoop !console = do
                 consoleOut "🐴🐴🐯🐯\n"
               doneRightOrRebirth
   doneRightOrRebirth
- where
-  consoleOut      = writeTQueue (consoleIO console) . ConsoleOut
-  consoleShutdown = writeTQueue (consoleIO console) ConsoleShutdown
+  where consoleOut = writeTBQueue (consoleIO console) . ConsoleOut

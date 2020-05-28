@@ -28,7 +28,7 @@ determineSwarmWorkStarter = do
   ppid     <- getParentProcessID
   pid      <- getProcessID
   getArgs >>= \case
-    -- no arg, run as repl
+    -- no arg, will run as forager/repl
     [] -> return SwarmWorkStarter { swarm'executable  = T.pack execPath
                                   , swarm'work'dir    = T.pack pwd
                                   , swarm'work'module = ""
@@ -36,7 +36,7 @@ determineSwarmWorkStarter = do
                                   , swarm'worker'pid  = 0
                                   , swarm'wsc'fd      = 0
                                   }
-    -- single arg, run as headhunter
+    -- single arg, will run as headhunter
     [workModule] -> return SwarmWorkStarter
       { swarm'executable  = T.pack execPath
       , swarm'work'dir    = T.pack pwd
@@ -45,7 +45,7 @@ determineSwarmWorkStarter = do
       , swarm'worker'pid  = 0
       , swarm'wsc'fd      = 0
       }
-    -- double args, run as swarm worker
+    -- double args, will run as swarm worker
     [workModule, wscFd] -> return SwarmWorkStarter
       { swarm'executable  = T.pack execPath
       , swarm'work'dir    = T.pack pwd

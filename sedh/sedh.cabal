@@ -49,11 +49,31 @@ library
         mtl -any,
         transformers -any
 
-executable sedh
+executable gwd
     main-is: Main.hs
-    hs-source-dirs: repl
+    hs-source-dirs: gwd
     other-modules:
         Repl
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
+                        BangPatterns TupleSections ScopedTypeVariables
+    ghc-options: -Wall -threaded
+    build-depends:
+        sedh -any,
+        nedh -any,
+        edh -any,
+        lossless-decimal -any,
+        base >=4.12,
+        stm >=2.5,
+        text -any,
+        bytestring -any,
+        mtl -any,
+        transformers -any
+
+executable forager
+    main-is: Main.hs
+    hs-source-dirs: forager
+    other-modules:
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
                         BangPatterns TupleSections ScopedTypeVariables

@@ -55,7 +55,6 @@ wscTakeProc (ArgsPack [EdhDecimal !wscFd, EdhObject !peerObj] !kwargs) !exit
             . tryPutTMVar wkrEoL
             )
           $ \_ -> exitEdhProc exit $ EdhObject peerObj
-
 wscTakeProc _ _ = throwEdh UsageError "Invalid args"
 
 
@@ -72,10 +71,10 @@ workerThread !wscFd !peerId !pktSink !poq !wkrEoL =
       >>= (gracefulClose sock 5000 <*)
       .   atomically
       .   tryPutTMVar wkrEoL
-
  where
   netComm :: Socket -> IO ()
   netComm !sock = do
+
     -- pump commands in, 
     -- make this thread the only one reading the handle
     -- note this won't return, will be asynchronously killed on eol

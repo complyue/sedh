@@ -34,7 +34,7 @@ main = do
         -- install batteries provided by sedh
         installSwarmBatteries starter world
 
-        runEdhModule world "swarm/forager" edhModuleAsIs >>= \case
+        runEdhModule world "swarm/forage" edhModuleAsIs >>= \case
           Left !err -> atomically $ do
             -- program crash on error
             consoleOut "Edh swarm forager crashed with an error:\n"

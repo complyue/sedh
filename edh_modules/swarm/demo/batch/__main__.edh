@@ -4,6 +4,9 @@
 # module, with arbitrary overrides possible from this
 # module
 
+# it's a good idea to archive this file as part of the result
+# data done by the swarm, even version control them
+
 # import reusable work definition from some module, don't
 # put too much logic in this entry module, an entry module
 # should just like a comprehensive command line, don't 
@@ -11,14 +14,20 @@
 # yourself in duplicating works in such entry modules
 import * 'swarm/demo/batch'
 
+# if greater than 0, don't call for workers from the swarm,
+# start worker processes on this node to do the work, with
+# maximum number of local processes limited by it
+effect localHeads = 0
+
 # target swarm address
 effect swarmAddr = '255.255.255.255'
 effect swarmPort = 3722
 
-# control work priority and maximum number of worker nodes we
-# hire from the swarm
+# control work priority and maximum number of worker processes
+# we hire from the swarm
 effect priority = 0
 effect headcount = 10
+
 
 # exported to override what's in the definition module scope,
 # serving as lexical default values to `manageThisWork()`

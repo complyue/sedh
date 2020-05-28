@@ -32,6 +32,17 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
     let moduScope = contextScope $ edh'context pgs
         modu      = thisObject moduScope
 
+    mths <- sequence
+      [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+      | (mc, nm, hp, args) <-
+        [ ( EdhMethod
+          , "wscTake"
+          , wscTakeProc
+          , PackReceiver
+            [RecvArg "wscFd" Nothing Nothing, RecvArg "peerObj" Nothing Nothing]
+          )
+        ]
+      ]
     let !moduArts =
           [ ("jobExecutable"  , EdhString executable)
             , ("jobWorkDir"     , EdhString workDir)
@@ -40,18 +51,7 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
             , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
             , ("wscFd"          , EdhDecimal $ fromIntegral wscFd)
             ]
-            ++ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-               | (mc, nm, hp, args) <-
-                 [ ( EdhMethod
-                   , "wscTake"
-                   , wscTakeProc
-                   , PackReceiver
-                     [ RecvArg "wscFd"   Nothing Nothing
-                     , RecvArg "peerObj" Nothing Nothing
-                     ]
-                   )
-                 ]
-               ]
+            ++ mths
     artsDict <- createEdhDict
       $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]
     updateEntityAttrs pgs (objEntity modu)
@@ -67,63 +67,59 @@ startSwarmWork = do
     determineSwarmWorkStarter
 
   console <- defaultEdhConsole defaultEdhConsoleSettings
-  let
-    consoleOut      = writeTQueue (consoleIO console) . ConsoleOut
-    consoleShutdown = writeTQueue (consoleIO console) ConsoleShutdown
+  let consoleOut      = writeTQueue (consoleIO console) . ConsoleOut
+      consoleShutdown = writeTQueue (consoleIO console) ConsoleShutdown
 
-    workProg :: IO ()
-    workProg = do
+      workProg :: IO ()
+      workProg = do
 
-      -- create the world, we always work with this world no matter how
-      -- many times the Edh programs crash
-      world <- createEdhWorld console
-      installEdhBatteries world
+        -- create the world, we always work with this world no matter how
+        -- many times the Edh programs crash
+        world <- createEdhWorld console
+        installEdhBatteries world
 
-      -- install batteries provided by nedh
-      installNetBatteries world
+        -- install batteries provided by nedh
+        installNetBatteries world
 
-      -- install batteries provided by sedh
-      installSwarmBatteries starter world
+        -- install batteries provided by sedh
+        installSwarmBatteries starter world
 
-      if wscFd == 0
-        then runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
-          Left !err -> atomically $ do
-            -- program crash on error
-            consoleOut "Swarm headhunter crashed with an error:\n"
-            consoleOut $ T.pack $ show err <> "\n"
-          Right !phv -> case edhUltimate phv of
-            -- clean program halt, all done
-            EdhNil ->
-              atomically
-                $  consoleOut
-                $  "Swarm work "
-                <> workModu
-                <> " done right.\n"
-            -- unclean program exit
-            _ -> atomically $ do
-              consoleOut "Swarm headhunter halted with a result:\n"
-              consoleOut $ (<> "\n") $ case phv of
-                EdhString msg -> msg
-                _             -> T.pack $ show phv
-        else
-          runEdhModule world "swarm/worker" (prepareSwarmWorkerModu starter)
-            >>= \case
-                  Left !err -> atomically $ do
-                    -- program crash on error
-                    consoleOut "Swarm worker crashed with an error:\n"
-                    consoleOut $ T.pack $ show err <> "\n"
-                  Right !phv -> case edhUltimate phv of
-                    -- clean program halt, all done
-                    EdhNil ->
-                      atomically $ consoleOut "Swarm worker right retired.\n"
-                    -- unclean program exit
-                    _ -> atomically $ do
-                      consoleOut "Swarm worker halted with a result:\n"
-                      consoleOut $ (<> "\n") $ case phv of
-                        EdhString msg -> msg
-                        _             -> T.pack $ show phv
+        if wscFd == 0
+          then runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
+            Left !err -> atomically $ do
+              -- program crash on error
+              consoleOut "Swarm headhunter crashed with an error:\n"
+              consoleOut $ T.pack $ show err <> "\n"
+            Right !phv -> case edhUltimate phv of
+              -- clean program halt, all done
+              EdhNil ->
+                atomically
+                  $  consoleOut
+                  $  "Swarm work "
+                  <> workModu
+                  <> " done right.\n"
+              -- unclean program exit
+              _ -> atomically $ do
+                consoleOut "Swarm headhunter halted with a result:\n"
+                consoleOut $ (<> "\n") $ case phv of
+                  EdhString msg -> msg
+                  _             -> T.pack $ show phv
+          else runEdhModule world "swarm/worker" edhModuleAsIs >>= \case
+            Left !err -> atomically $ do
+              -- program crash on error
+              consoleOut "Swarm worker crashed with an error:\n"
+              consoleOut $ T.pack $ show err <> "\n"
+            Right !phv -> case edhUltimate phv of
+              -- clean program halt, all done
+              EdhNil -> atomically $ consoleOut "Swarm worker right retired.\n"
+              -- unclean program exit
+              _      -> atomically $ do
+                consoleOut "Swarm worker halted with a result:\n"
+                consoleOut $ (<> "\n") $ case phv of
+                  EdhString msg -> msg
+                  _             -> T.pack $ show phv
 
-      atomically consoleShutdown
+        atomically consoleShutdown
 
   void $ forkFinally workProg $ \result -> do
     case result of

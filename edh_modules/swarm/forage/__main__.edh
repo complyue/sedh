@@ -1,6 +1,8 @@
 
-import * 'swarm/forager'
+# this is the entry module of an Edh Swarm Forager
 
+
+import * 'swarm/forager'
 
 case forageOn(
   10, # headcount - number of worker processes to vend
@@ -9,7 +11,5 @@ case forageOn(
   '0.0.0.0', 3722,
 ) of { sniffer } -> { pass }
 
-
-# keep the forager process running in case this file is redirected
-# as stdin
+# keep the forager process running
 sniffer.join()

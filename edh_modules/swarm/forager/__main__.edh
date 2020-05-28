@@ -6,6 +6,7 @@
 
 import (Addr, **_) 'net'
 
+# procedures responding to call-for-workers are defined there
 import * './mgmt'
 
 

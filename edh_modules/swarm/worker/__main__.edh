@@ -7,14 +7,12 @@ import * 'swarm/symbols'
 
 import (
   jobWorkModu, swarmManagerPid, swarmWorkerPid,
+  wscFd, wscTake,
 **_) 'swarm/RT'
 
 
-# this should have been implanted by host module initialization, mention it
-# here for purpose of e.g. IDE code completion
-#
-# peer is connected to a work source (e.g. a headhunter)
-peer ?:= Peer()
+# take the worksource connection file describer, make it a peer for comm
+peer = wscTake(wscFd, Peer())
 
 
 # inherit the work module, so we have access to `@doOneJob` implemented there

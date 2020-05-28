@@ -75,7 +75,7 @@ class HeadHunter {
     init=__swarm_conn_init__,
   ) of { server } -> {
     case server.addrs() of {
-      { addr =>_ } -> console.info<| 'HeadHunter listening: ' ++ addr
+      { wsAddr =>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
       # or the network has failed, propagate the error
       server.join()  # this usually throws
       # in case join() didn't throw, report this error
@@ -87,6 +87,8 @@ class HeadHunter {
   case Advertiser(
     # target swarm address
     perform swarmAddr, perform swarmPort,
+    # announce call-for-workers from our worksource addr
+    fromAddr=wsAddr,
   ) of { cfw } -> { pass }
 
   # data structures for job scheduling

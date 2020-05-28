@@ -26,7 +26,7 @@ import           Language.Edh.Swarm.Worker
 
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
-installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid workerPid _wscFd) !world
+installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid workerPid wscFd) !world
   = void $ installEdhModule world "swarm/RT" $ \pgs exit -> do
 
     let moduScope = contextScope $ edh'context pgs
@@ -34,11 +34,24 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
 
     let !moduArts =
           [ ("jobExecutable"  , EdhString executable)
-          , ("jobWorkDir"     , EdhString workDir)
-          , ("jobWorkModu"    , EdhString workModu)
-          , ("swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
-          , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
-          ]
+            , ("jobWorkDir"     , EdhString workDir)
+            , ("jobWorkModu"    , EdhString workModu)
+            , ("swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
+            , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
+            , ("wscFd"          , EdhDecimal $ fromIntegral wscFd)
+            ]
+            ++ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+               | (mc, nm, hp, args) <-
+                 [ ( EdhMethod
+                   , "wscTake"
+                   , wscTakeProc
+                   , PackReceiver
+                     [ RecvArg "wscFd"   Nothing Nothing
+                     , RecvArg "peerObj" Nothing Nothing
+                     ]
+                   )
+                 ]
+               ]
     artsDict <- createEdhDict
       $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]
     updateEntityAttrs pgs (objEntity modu)

@@ -7,7 +7,6 @@ import (Peer, **_) 'net/RT'
 import * 'net/symbols'
 effect import * 'net/effects'
 
-
 # expose service procedures exported from the persistent module
 import * '.'
 

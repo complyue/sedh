@@ -5,6 +5,9 @@
 
 import * 'net'
 
+# will use classes there, but not to re-rexport them
+import * 'swarm/forager/mgmt'
+
 
 export method forageOn (
   headcount    = 1,          # number of worker processes to vend
@@ -13,7 +16,8 @@ export method forageOn (
   swarmPort    = 3722,       # local port to sniff for call-for-workers
   foragerModu  = 'swarm/forager',   # the forager reacting module
 ) {
-  method __forager_init__() {
+  method __init_forager__() {
+    that.forager = Forager(headcount)
     that.targetPrefix = targetPrefix
   }
 
@@ -23,7 +27,7 @@ export method forageOn (
     # addr/port to sniff on
     swarmAddr, swarmPort,
     # sniffer module initializer
-    init = __forager_init__,
+    init = __init_forager__,
   ) of { sniffer } -> { pass }
 
   case sniffer.addrs() of {

@@ -1,22 +1,157 @@
 
 import * 'net'
 
+import * 'swarm/RT'
 
-# A work source (e.g. a head hunter) should invoke this as a command
-export method WorkToDo(
-  hcPlanned,     # planned headcount to recruit
-  executable,    # executable file path to launch as worker processes
-  priority = 0,  # used to prioritize allocation of work heads
-  target = '',   # for prefix based filtering of uninteresting work
-) {
-  case target of {
-    { that.targetPrefix >@ _ } -> { pass }
-    return nil  # filtered out by prefix
+
+# worksource connection
+export class WSC {
+
+  peer = None
+
+  method eol() peer &> peer.eol() |> true
+
+  hcEmployed = 0
+
+  method __init__ (
+    forager as this.forager,
+    wsAddr, hcAvailable,
+    hcPlanned as this.hcPlanned,
+    executable as this.executable,
+    workDir as this.workDir,
+    priority as this.priority,
+  ) {
+
+    method __init_nego__ () {
+      this.peer = that.peer
+      that.wsc = this
+    }
+    case Client(
+      this.forager.negoModu, wsAddr, init=__init_nego__,
+    ) of -> { clnt } -> {
+      case clnt.addrs() of { addr =>_ } ->
+        console.debug<| 'Connected to worksource at: ' ++ addr
+      case clnt.eol() of {
+        false -> { pass }
+        clnt.join()  # this normally throws
+        error('connection to worksource failed')
+      }
+      producer offerHeads(outlet) {
+        this.peer.postCommand(expr
+
+OfferHeads({$ swarmManagerPid $}, {$ min(hcAvailable, this.hcPlanned) $})
+
+        )
+        # wait until disconnected from worksource, then mark eos to stop
+        # the hc confirmation update loop, or stm deadlock would kill us
+        this.peer.join() @=> outlet <- nil
+      }
+      go for hcComfirmed from offerHeads(this.peer.armChannel(dataChan))
+      do {
+        hcConfirmed < 0 -> error (
+          'Suspecious worksource confirming negative hc: ' ++ hcConfirmed
+        )
+        hcDelta = hcConfirmed - this.hcEmployed
+        this.hcEmployed = hcComfirmed
+        this.forager.hcEmployed += hcDelta
+
+        # TODO manage worker processes accordingly
+      }
+    }
+
   }
 
-  # worksource address to connect, which is from the network facing
-  # module of a sniffer and i.e. the forager
-  wsAddr = that.addr
+  method update (
+    hcPlanned, executable, workDir, priority,
+  ) {
+    # TODO check and deal with expected / unexpected changes
+    this.hcPlanned = hcPlanned
+    this.executable = executable
+    this.workDir = workDir
+    this.priority = priority
+
+    # TODO offer more heads as appropriate
+
+  }
+
+}
+
+export class Forager {
+
+  # provides no head by default
+  method __init__(
+    headcount as this.headcount = 0,
+    negoModu as this.negoModu = 'swarm/negotiator',
+  ) pass
+
+  hcEmployed = 0
+  wsDict = {}
+
+  # A work source (e.g. a head hunter) should announce call-for-workers
+  # in this format, and this intends to be exposed (imported) by a network
+  # facing entry module of the sniffer, so as to react to cfws
+  export method WorkToDo (
+    hcPlanned,     # planned headcount to recruit
+    executable,    # executable file path to launch as worker processes
+    workDir,       # working directory
+    priority = 0,  # used to prioritize allocation of work heads
+    target = '',   # for prefix based filtering of uninteresting work
+  ) {
+    case target of {
+      { that.targetPrefix >@ _ } -> { pass }
+      return nil  # filtered out by prefix
+    }
+
+    if this.hcEmployed >= this.headcount then {
+      # calibrate total headcount employed
+      hcEmployed = 0
+      ai for (wsKey, wsc) from this.wsDict do case wsc.eol() of {
+        false -> hcEmployed += wsc.hcEmployed
+        # or forget this wsc as already end-of-life, i.e. disconnected
+        this.wsDict[wsKey] = nil
+      }
+      this.hcEmployed = hcEmployed
+    }
+    (hcAvailable = this.headcount - this.hcEmployed)
+    < 1 -> { pass }  # no free head available, ignore this cfw
+
+    # `that.addr` is the worksource address we are supposed to connect,
+    # which is from the network facing module of a sniffer i.e. the forager
+    #
+    # such addr objects are non-equal from eachother in object semantics,
+    # even from the same advertiser, so we use its repr str as identifier
+    wsKey = repr(that.addr)
+
+    ai case this.wsDict[wsKey] of {
+      {{ Addr: _ }} ->  # another routine is already connecting to it
+        return nil
+      {{ WSC: wsc }} -> {
+        if false == wsc.eol() then {
+          go wsc.update( hcPlanned, executable, workDir, priority, )
+          return nil  # nothing more to do here
+        }
+        fallthrough  # previous wsc disconnected, let's start over
+      }
+      # mark that we are going to connect to it
+      wsDict[wsKey] = that.addr
+    }
+
+    {
+      case WSC(
+        forager=this, wsAddr=that.addr, hcAvailable=hcAvailable,
+        hcPlanned, executable, workDir, priority,
+      ) of { wsc } -> wsDict[wsKey] = wsc
+    } $=> { wsExc } -> {
+      # NOTE this handles exceptions occured in spawned goroutines as well,
+      #      run in such a goroutine's thread in that case
+      console.error<| 'Forager failed contacting worksource at '
+        ++ that.addr ++ '\n' ++ wsExc
+    } @=> {
+      # clear the mark anyway, in case we didn't make it
+      ai case wsDict[wsKey] of that.addr -> wsDict[wsKey] = nil
+    }
+
+  }
 
 }
 

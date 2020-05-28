@@ -1,0 +1,44 @@
+
+# this is the worksource facing entry module of an Edh swarm forager
+
+import (Peer, **_) 'net/RT'
+import * 'net/symbols'
+effect import * 'net/effects'
+
+import * 'swarm/forager/mgmt'
+
+
+# this should have been implanted by per-connection peer module initialization
+wsc ?:= WSC()
+# expose reacting procedures exported from the wsc object
+import * wsc
+
+
+# this should have been implanted by per-connection peer module preparation
+peer ?:= Peer()
+console.debug<| 'Swarm forager negotiating with worksource - ' ++ peer
+
+
+effect {
+  ;@netPeer = peer
+  ;@dataSink = peer.armChannel(dataChan)
+}
+
+
+{
+
+  while false == peer.eol() case peer.readCommand() of {
+    # note a command resulting in nil is ignored here
+    { cmdVal } -> {
+      console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
+      cmdVal = nil  # clear it
+    }
+  }
+
+} @=> {
+  { exc } -> {
+    console.error<| 'Disconnecting worksource ' ++ peer
+      ++ ' for error: ' ++ exc
+  }
+  console.debug<| 'Disconnecting worksource ' ++ peer
+}

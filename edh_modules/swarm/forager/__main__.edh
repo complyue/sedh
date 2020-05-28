@@ -4,10 +4,20 @@
 # casted (broadcast, multicast, unicast) to the address a
 # sniffer is configured to sniff
 
+import (Addr, **_) 'net'
+
 import * './mgmt'
 
 
-import (Addr, **_) 'net'
+# source address of the sniffed command packet, updated each
+# time a packet is sniffed and executed as command
+addr := Addr()
+
+
+# configured prefix to filter out uninteresting worksources
+# can be supplied in host module preparation
+targetPrefix ?:= ''
+
 
 # mocking artifacts those should have been implanted by host
 # module preparation, to give meaningful information to IDEs
@@ -20,32 +30,6 @@ false -> {  # this block is impossible to run
   # check end-of-life of the sniffer
   method eol() return true
 
-}
-
-# source address of the sniffed command packet, updated each
-# time a packet is sniffed and executed as command
-addr := Addr()
-
-
-# following should have been implanted by host module initialization
-targetPrefix ?:= ''
-
-# A work source (e.g. a head hunter) should invoke this as a command
-method WorkToDo(
-  hcPlanned,     # planned headcount to recruit
-  executable,    # executable file path to launch as worker processes
-  priority = 0,  # used to prioritize allocation of work heads
-  target = '',   # for prefix based filtering of uninteresting work
-) {
-  case target of {
-    { targetPrefix >@ _ } -> { pass }
-    return nil  # filtered out by prefix
-  }
-
-  negotiateWorkToDo(
-    addr,
-    hcPlanned, executable, priority,
-  )
 }
 
 

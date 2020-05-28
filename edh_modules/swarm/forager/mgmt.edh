@@ -1,10 +1,22 @@
 
+import * 'net'
 
-export method negotiateWorkToDo(
-  workSourceAddr,
+
+# A work source (e.g. a head hunter) should invoke this as a command
+export method WorkToDo(
   hcPlanned,     # planned headcount to recruit
   executable,    # executable file path to launch as worker processes
   priority = 0,  # used to prioritize allocation of work heads
+  target = '',   # for prefix based filtering of uninteresting work
 ) {
+  case target of {
+    { that.targetPrefix >@ _ } -> { pass }
+    return nil  # filtered out by prefix
+  }
+
+  # worksource address to connect, which is from the network facing
+  # module of a sniffer and i.e. the forager
+  wsAddr = that.addr
 
 }
+

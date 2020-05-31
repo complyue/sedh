@@ -30,7 +30,7 @@ import * forager
 
 # mocking artifacts those should have been implanted by host
 # module preparation, to give meaningful information to IDEs
-# and/or other tools, for purpose of, e.g. auto completion.
+# and/or other tools, for purpose of, e.g. code completion.
 false -> {  # this block is impossible to run
 
   # sniff another command from the network
@@ -45,9 +45,10 @@ false -> {  # this block is impossible to run
 # loop forever until eol on error, or stopped elsewhere
 while false == eol() {
 
-  # note nil result from `sniff()` is silently ignored
+  # note nil result from `sniff()` is very much expected,
+  # and is silently ignored
   case sniff() of { cmdVal } -> {
-    console.info<| 'Sniffed cmd:\n  ' ++ cmdVal
+    console.info<| 'Unexpected cmd result:\n  ' ++ cmdVal
   }
 
 } $=> { exc } -> {

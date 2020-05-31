@@ -12,10 +12,12 @@ export class WSC {
   method eol() peer &> peer.eol() |> true
 
   hcEmployed = 0
+  workers = {}  # worker processes by pid
 
   method __init__ (
     forager as this.forager,
-    wsAddr, hcAvailable,
+    wsAddr, 
+    hcReserved as this.hcEmployed,
     hcPlanned as this.hcPlanned,
     executable as this.executable,
     workDir as this.workDir,
@@ -39,21 +41,27 @@ export class WSC {
       producer offerHeads(outlet) {
         this.peer.postCommand(expr
 
-OfferHeads({$ swarmManagerPid $}, {$ min(hcAvailable, this.hcPlanned) $})
+OfferHeads({$ swarmManagerPid $}, {$ this.hcEmployed $})
 
         )
         # wait until disconnected from worksource, then mark eos to stop
         # the hc confirmation update loop, or stm deadlock would kill us
         this.peer.join() @=> outlet <- nil
       }
-      go for hcComfirmed from offerHeads(this.peer.armChannel(dataChan))
-      do {
+      go for hcComfirmed from offerHeads(this.peer.armChannel(dataChan)) do {
         hcConfirmed < 0 -> error (
           'Suspecious worksource confirming negative hc: ' ++ hcConfirmed
         )
-        hcDelta = hcConfirmed - this.hcEmployed
-        this.hcEmployed = hcComfirmed
-        this.forager.hcEmployed += hcDelta
+        ai {
+          hcSpared = this.hcEmployed - hcConfirmed
+          hcSpared < 0 -> error (
+            'Suspecious worksource confirming excessive hc: ' ++ hcConfirmed
+          ) 
+          if hcSpared > 0 then {
+            this.hcEmployed -= hcSpared
+            this.forager.hcEmployed += hcSpared
+          }
+        }
 
         # TODO manage worker processes accordingly
       }
@@ -71,7 +79,10 @@ OfferHeads({$ swarmManagerPid $}, {$ min(hcAvailable, this.hcPlanned) $})
     this.priority = priority
 
     # TODO offer more heads as appropriate
+  }
 
+  method stop() {
+    # TODO forcefully stop all workers for this worksource
   }
 
 }
@@ -122,23 +133,34 @@ export class Forager {
     # even from the same advertiser, so we use its repr str as identifier
     wsKey = repr(that.addr)
 
+    # see it's a known worksource, a new wip connection, or a fresh new
+    # worksource, handle accordingly
     ai case this.wsDict[wsKey] of {
-      {{ Addr: _ }} ->  # another routine is already connecting to it
+      {{ Addr: _ }} ->  # another connection attempt to it is being made
         return nil
       {{ WSC: wsc }} -> {
-        if false == wsc.eol() then {
-          go wsc.update( hcPlanned, executable, workDir, priority, )
-          return nil  # nothing more to do here
-        }
-        fallthrough  # previous wsc disconnected, let's start over
+        # let the previous wsc object handle the update, even if it has
+        # disconnected, it needs to track running worker processes for
+        # proper retirement, then clear the wsc record from `wsDict`.
+        # we won't attempt new connections to a worksource until last
+        # connection is all clean
+        go wsc.update( hcPlanned, executable, workDir, priority, )
+        return nil  # nothing more to do here
       }
-      # mark that we are going to connect to it
-      wsDict[wsKey] = that.addr
+      # so we are going to make a new connection to it
+      # TODO use a priority queue to prioritize among worksources
+      ( hcReserved = min( hcPlanned,
+        max(0, this.headcount - this.hcEmployed) )
+      ) > 0 -> {
+        this.hcEmployed -= hcReserved
+        wsDict[wsKey] = that.addr
+      }
     }
+    not hcReserved > 0 -> { pass }
 
     {
       case WSC(
-        forager=this, wsAddr=that.addr, hcAvailable=hcAvailable,
+        forager=this, wsAddr=that.addr, hcReserved=hcReserved,
         hcPlanned, executable, workDir, priority,
       ) of { wsc } -> wsDict[wsKey] = wsc
     } $=> { wsExc } -> {
@@ -147,8 +169,13 @@ export class Forager {
       console.error<| 'Forager failed contacting worksource at '
         ++ that.addr ++ '\n' ++ wsExc
     } @=> {
-      # clear the mark anyway, in case we didn't make it
-      ai case wsDict[wsKey] of that.addr -> wsDict[wsKey] = nil
+      # check if we actually made it, unleash the reservation if not
+      ai case wsDict[wsKey] of that.addr -> {
+        # forget about it
+        wsDict[wsKey] = nil
+        # unleash the reservation
+        this.hcEmployed += hcReserved
+      }
     }
 
   }

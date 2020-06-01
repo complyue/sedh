@@ -126,8 +126,6 @@ export class Forager {
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
     this.headcount >= 1 |> error('Invalid headcount: '++this.headcount)
-    # fill initial idle headcount
-    this.hcIdle <- this.headcount
   }
 
   # A work source (e.g. a head hunter) should announce call-for-workers
@@ -169,27 +167,34 @@ export class Forager {
   }
 
   method scheduleTeams() {
-    for wsc from this.wsq.streamOut() {
-      hcCum = 0
-      cumSince = 0
-      for hcAvailable from this.hcIdle do {
-        hcCum += hcAvailable
-        hcCum < 1 -> { continue }
-        # cummulate available heads for up to 2 seconds, if not at best
-        # condition in head offering
-        (hcCum < this.headcount && hcCum < wsc.hcPlanned)
-        && (cumSince == 0 || console.now() - cumSince < 2e9) ->
-          if cumSince == 0 then cumSince = console.now()
-        # engage with this worksource with as many free heads atm, post
-        # number of spare heads as idle count afterwards
-        ai {
-          # `engage()` should return quickly without waiting for network,
-          # network operations are actually forbidden by the ai tx
-          this.hcIdle <- hcCum - wsc.engage(hcCum)
-          hcCum = 0
-          cumSince = 0
-        }
-      }
+    hcCum = 0 nsLastIdle = 0
+    # let it start out to be the configured total headcount,  there won't
+    # be further post to it until some heads are offered then unleashed
+    this.hcIdle <- this.headcount
+    # collect idle heads in a dedicated thread, to not miss any unleash
+    go for hcNewIdle from this.hcIdle do {
+      hcNewIdle < 1 -> { continue }
+      nsLastIdle = console.now()
+      hcCum += hcNewIdle
+    }
+    # insert some zero counts, so the check in following loop won't dead
+    # wait in case it can only partial fill for a long time
+    go for _ from console.everySeconds(1) do this.hcIdle <- 0
+
+    for wsc from this.wsq.streamOut() do {
+      # wait until got fulfilling free heads, or waited long enough while
+      # partial filling is possible
+      # TODO make the hardcoded 5 seconds tunable
+      for _ from this.hcIdle do
+        (hcCum >= wsc.hcPlanned || hcCum >= this.headcount)
+        || (hcCum > 0 && console.now() - nsLastIdle > 5e9)
+        -> { break }
+
+      # engage with this worksource with as many free heads atm
+      # `engage()` should return quickly without waiting for network,
+      # network operations are actually forbidden by the intrinsic tx of
+      # assignment
+      hcCum -= wsc.engage(hcCum)
     }
   }
 

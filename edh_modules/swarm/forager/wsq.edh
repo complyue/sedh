@@ -1,0 +1,107 @@
+
+# Worksource Queue implementation
+
+
+{#
+ # Prioritized Recent Queue
+ #
+ # priority first, then first in first out at same priority;
+ # but may be pushed out of queue, by same priority, after a
+ # while if many new comes.
+ #
+ # Parameters
+ # ==========
+ # 	* lingers - the least seconds a task should be kept in queue.
+ # 	* backlog - the max number of records should be kept in queue.
+ #
+ # Implications
+ # ============
+ # 	* new records can push old records out of queue, those lingered
+ # 	  more time than `lingers`.
+ # 	* new records will be dropped if the queue is full of lingering
+ # 	  records, wrt `backlog`.
+ #
+ # Starvation Preventation
+ # =======================
+ # 	* a worksource should repeat announcing call-for-workers after
+ # 	  `lingers` seconds if it's still not fulfilled then.
+ # 	* fast repetitions from same worksource within `lingers` seconds
+ # 	  should not get duplicated records created, and should neither
+ # 	  get the existing task's enqueue time updated, for other
+ # 	  worksource's sake of fireness.
+ #
+ # Note
+ # ====
+ # 	this implementation assumes that there're not too many priority
+ # 	levels, or it'll perform rather inefficiently.
+ #}
+class PRQ {
+
+  method __init__(
+    # the lease seconds a task should be kept in queue
+    lingers as this.lingers,
+
+    # the max number of records should be kept in queue
+    backlog as this.backlog,
+  ) pass
+
+  # mapping addr key to worksources those in queue
+  iqd = {}
+  # list of CRQs sorted by priority
+  pl = []
+
+
+  # queue change number, ever increasing as each new ws enqueued
+  qcn = sink
+  qcn <- 0  # initialize to 0
+
+  generator streamOut() while true {
+    ai {
+      case this.pl of {
+        { crq => rest'pl } -> case crq.l of {
+          { qr => rest'l } -> {
+            case qr of {
+              {( ws, _qt )} -> { pass }
+              error('impossible')
+            }
+            if null(rest'l)
+              then this.pl = rest'pl
+              else crq.l = rest'l
+          }
+          error('bug: empty CRQ in queue')
+        }
+        ws = None
+        qcn = mre(this.qcn)
+      }
+    }
+    if ws != None then {
+      yield ws
+      continue
+    }
+    for next'qcn from this.qcn do
+      # wait until queue changed
+      if next'qcn != qcn then { break }
+  }
+
+  method enque(ws) {
+    wsKey = repr(ws)
+  }
+
+}
+
+
+{#
+ # Capped Recent Queue
+ #}
+class CRQ {
+
+  method __init__(
+    prq as this.prq,
+    priority as this.priority,
+  ) pass
+
+  # list of worksources and their respective enque time, each as a tuple
+  l = []
+
+}
+

@@ -3,40 +3,52 @@ import * 'net'
 
 import * 'swarm/RT'
 
+import * './wsq'
 
-# worksource connection
+# worksource connection, and the team of workers employed by it
 export class WSC {
-
-  peer = None
-
-  method eol() peer &> peer.eol() |> true
 
   hcEmployed = 0
   workers = {}  # worker processes by pid
 
   method __init__ (
     forager as this.forager,
-    wsAddr, 
-    hcReserved as this.hcEmployed,
+    addr as this.addr, 
     hcPlanned as this.hcPlanned,
     executable as this.executable,
     workDir as this.workDir,
     priority as this.priority,
-  ) {
+  ) pass
 
-    method __init_nego__ () {
-      this.peer = that.peer
-      that.wsc = this
+  method __repr__() {
+    '<WorkTeamFor ' ++ this.addr ++ ' #' ++ this.hcEmployed ++ '>'
+  }
+
+  method key() repr(this.addr)
+
+  peer = None
+
+  method engage (hcAvailable) {
+    ai {
+      this.hcEmployed = min(hcAvailable, this.hcPlanned)
+      this.forager.wsd[this.key()] = this
     }
-    case Client(
-      this.forager.negoModu, wsAddr, init=__init_nego__,
-    ) of -> { clnt } -> {
-      case clnt.addrs() of { addr =>_ } ->
-        console.debug<| 'Connected to worksource at: ' ++ addr
-      case clnt.eol() of {
-        false -> { pass }
-        clnt.join()  # this normally throws
-        error('connection to worksource failed')
+
+    { go {
+      method __init_nego__ () {
+        this.peer = that.peer
+        that.wsc = this
+      }
+      case Client(
+        this.forager.negoModu, this.addr, init=__init_nego__,
+      ) of -> { clnt } -> {
+        case clnt.addrs() of { addr =>_ } ->
+          console.debug<| 'Connected to worksource at: ' ++ addr
+        case clnt.eol() of {
+          false -> { pass }
+          clnt.join()  # this normally throws
+          error('connection to worksource failed')
+        }
       }
       producer offerHeads(outlet) {
         this.peer.postCommand(expr
@@ -48,7 +60,7 @@ OfferHeads({$ swarmManagerPid $}, {$ this.hcEmployed $})
         # the hc confirmation update loop, or stm deadlock would kill us
         this.peer.join() @=> outlet <- nil
       }
-      go for hcComfirmed from offerHeads(this.peer.armChannel(dataChan)) do {
+      for hcComfirmed from offerHeads(this.peer.armChannel(dataChan)) do {
         hcConfirmed < 0 -> error (
           'Suspecious worksource confirming negative hc: ' ++ hcConfirmed
         )
@@ -59,14 +71,32 @@ OfferHeads({$ swarmManagerPid $}, {$ this.hcEmployed $})
           ) 
           if hcSpared > 0 then {
             this.hcEmployed -= hcSpared
-            this.forager.hcEmployed += hcSpared
+            this.forager.hcIdle <- hcSpared
           }
         }
-
         # TODO manage worker processes accordingly
+
       }
+    } } $=> { exc } -> {  # this catches exceptions occurred directly or
+      # in forked threads
+      console.error<| 'Stopping team '++this++' on error: ' ++ exc
+      this.stop()
     }
 
+    return this.hcEmployed
+  }
+
+  method stop() {
+    # TODO forcefully stop all workers for this worksource
+
+    # check releash occupied heads
+    wsKey = this.key()
+    ai case this.forager.wsd[wsKey] of {
+      nil -> { pass }  # already unleashed, don't repeat doing
+      # releash headcount occupied by this team
+      this.forager.wsd[wsKey] = nil
+      this.forager.hcIdel <- this.hcEmployed
+    }
   }
 
   method update (
@@ -77,26 +107,28 @@ OfferHeads({$ swarmManagerPid $}, {$ this.hcEmployed $})
     this.executable = executable
     this.workDir = workDir
     this.priority = priority
-
-    # TODO offer more heads as appropriate
-  }
-
-  method stop() {
-    # TODO forcefully stop all workers for this worksource
   }
 
 }
 
+
 export class Forager {
 
-  # provides no head by default
-  method __init__(
-    headcount as this.headcount = 0,
-    negoModu as this.negoModu = 'swarm/negotiator',
-  ) pass
+  # available headcounts to be offered
+  hcIdle = sink
+  # prioritized recent queue for backlog of worksources
+  wsq = PRQ()
+  # worksources currently being actively worked on
+  wsd = {}
 
-  hcEmployed = 0
-  wsDict = {}
+  method __init__(
+    headcount as this.headcount,
+    negoModu as this.negoModu = 'swarm/negotiator',
+  ) {
+    this.headcount >= 1 |> error('Invalid headcount: '++this.headcount)
+    # fill initial idle headcount
+    this.hcIdle <- this.headcount
+  }
 
   # A work source (e.g. a head hunter) should announce call-for-workers
   # in this format, and this intends to be exposed (imported) by a network
@@ -113,16 +145,66 @@ export class Forager {
       return nil  # filtered out by prefix
     }
 
-    if this.hcEmployed >= this.headcount then {
-      # calibrate total headcount employed
-      hcEmployed = 0
-      ai for (wsKey, wsc) from this.wsDict do case wsc.eol() of {
-        false -> hcEmployed += wsc.hcEmployed
-        # or forget this wsc as already end-of-life, i.e. disconnected
-        this.wsDict[wsKey] = nil
+    # `that.addr` is the worksource address we are supposed to connect,
+    # which is from the network facing module of a sniffer i.e. the forager
+    #
+    # such addr objects are non-equal from eachother in object semantics,
+    # even from the same advertiser, so we use its repr str as identifier
+    wsKey = repr(that.addr)
+    ai {
+      case this.wsd[wsKey] of {
+        { _ } -> { pass }  # already been worked on
+        case this.wsq.iqd[wsKey] of {
+          { wsc } -> {
+            # already in queue, refresh its known states up-to-date
+            wsc.update( hcPlanned, executable, workDir, priority, )
+          }
+          this.wsq.enque(WSC(
+            forager=this, addr=that.addr,
+            hcPlanned, executable, workDir, priority,
+          ))
+        }
       }
-      this.hcEmployed = hcEmployed
     }
+  }
+
+  method scheduleTeams() {
+    for wsc from this.wsq.streamOut() {
+      hcCum = 0
+      cumSince = 0
+      for hcAvailable from this.hcIdle do {
+        hcCum += hcAvailable
+        hcCum < 1 -> { continue }
+        # cummulate available heads for up to 2 seconds, if not at best
+        # condition in head offering
+        (hcCum < this.headcount && hcCum < wsc.hcPlanned)
+        && (cumSince == 0 || console.now() - cumSince < 2e9) ->
+          if cumSince == 0 then cumSince = console.now()
+        # engage with this worksource with as many free heads atm, post
+        # number of spare heads as idle count afterwards
+        ai {
+          # `engage()` should return quickly without waiting for network,
+          # network operations are actually forbidden by the ai tx
+          this.hcIdle <- hcCum - wsc.engage(hcCum)
+          hcCum = 0
+          cumSince = 0
+        }
+      }
+    }
+  }
+
+  method calibrateEmployment() {
+    hcEmployed = 0
+    ai for (wsKey, wsc) from this.wsd do case wsc.eol() of {
+      false -> hcEmployed += wsc.hcEmployed
+      # or forget this wsc as already end-of-life, i.e. disconnected
+      this.wsd[wsKey] = nil
+    }
+    return hcEmployed
+  }
+
+  method xxx() {
+    hcEmployed = calibrateEmployment()
     (hcAvailable = this.headcount - this.hcEmployed)
     < 1 -> { pass }  # no free head available, ignore this cfw
 
@@ -135,13 +217,13 @@ export class Forager {
 
     # see it's a known worksource, a new wip connection, or a fresh new
     # worksource, handle accordingly
-    ai case this.wsDict[wsKey] of {
+    ai case this.wsd[wsKey] of {
       {{ Addr: _ }} ->  # another connection attempt to it is being made
         return nil
       {{ WSC: wsc }} -> {
         # let the previous wsc object handle the update, even if it has
         # disconnected, it needs to track running worker processes for
-        # proper retirement, then clear the wsc record from `wsDict`.
+        # proper retirement, then clear the wsc record from `wsd`.
         # we won't attempt new connections to a worksource until last
         # connection is all clean
         go wsc.update( hcPlanned, executable, workDir, priority, )
@@ -153,16 +235,16 @@ export class Forager {
         max(0, this.headcount - this.hcEmployed) )
       ) > 0 -> {
         this.hcEmployed -= hcReserved
-        wsDict[wsKey] = that.addr
+        wsd[wsKey] = that.addr
       }
     }
     not hcReserved > 0 -> { pass }
 
     {
       case WSC(
-        forager=this, wsAddr=that.addr, hcReserved=hcReserved,
+        forager=this, addr=that.addr, hcReserved=hcReserved,
         hcPlanned, executable, workDir, priority,
-      ) of { wsc } -> wsDict[wsKey] = wsc
+      ) of { wsc } -> wsd[wsKey] = wsc
     } $=> { wsExc } -> {
       # NOTE this handles exceptions occured in spawned goroutines as well,
       #      run in such a goroutine's thread in that case
@@ -170,9 +252,9 @@ export class Forager {
         ++ that.addr ++ '\n' ++ wsExc
     } @=> {
       # check if we actually made it, unleash the reservation if not
-      ai case wsDict[wsKey] of that.addr -> {
+      ai case wsd[wsKey] of that.addr -> {
         # forget about it
-        wsDict[wsKey] = nil
+        wsd[wsKey] = nil
         # unleash the reservation
         this.hcEmployed += hcReserved
       }

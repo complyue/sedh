@@ -58,33 +58,59 @@ class PRQ {
   generator streamOut() while true {
     ai {
       case this.pl of {
-        { crq => rest'pl } -> case crq.l of {
-          { qr => rest'l } -> {
-            case qr of {
-              {( ws, _qt )} -> { pass }
-              error('impossible')
-            }
-            if null(rest'l)
-              then this.pl = rest'pl
-              else crq.l = rest'l
+        { crq => rest'pl } -> case crq.popLeft() of {
+          {( wsc, _qt )} -> {
+            if crq.length() < 1  # no more record at this priority
+            then this.pl = rest'pl  # forget this crq
           }
-          error('bug: empty CRQ in queue')
+          error('bug: empty CRQ in PRQ')
         }
-        ws = None
-        qcn = mre(this.qcn)
+        # empty PRQ
+        wsc = None
+        seen'qcn = mre(this.qcn)
       }
     }
-    if ws != None then {
-      yield ws
+    if wsc != None then {
+      yield wsc  # engagement with this worksource expected
       continue
     }
-    for next'qcn from this.qcn do
-      # wait until queue changed
-      if next'qcn != qcn then { break }
+    for qcn from this.qcn do  # wait until queue changed
+      qcn != seen'qcn -> { break }
   }
 
-  method enque(ws) {
-    wsKey = repr(ws)
+  method enque(wsc) ai {
+    crq = this.crq(wsc.priority)
+    if crq.pushLeft(wsc) then {
+      this.iqd[wsc.key()] = wsc
+      # increase & post queue change number
+      this.qcn <- case mre(this.qcn) of { qcn } ->
+        # do with some wrapback, don't grow the number too big
+        if qcn >= 1e6 then 1 else qcn+1
+    }
+  }
+
+  method crq(priority) ai {
+    higher = []
+    lower = this.pl
+    while true case lower of {
+      { crq => rest'pl } -> {
+        # already has a crq for this priority
+        if priority == crq.priority then return crq
+        if priority  > crq.priority then {
+          # found the insert position for this priority
+          crq = CRQ(this, priority)
+          this.pl = higher >> (crq => lower)
+          return crq
+        }
+        # priority is lower
+        crq => higher
+        lower = rest'pl
+      }
+      # create a crq with lowest priority
+      crq = CRQ(this, priority)
+      this.pl = higher >> (crq => lower)
+      return crq
+    }
   }
 
 }
@@ -95,13 +121,30 @@ class PRQ {
  #}
 class CRQ {
 
+  # queue of worksources and their respective enque time,
+  # each record being a tuple
+  extends Deque()
+
   method __init__(
     prq as this.prq,
     priority as this.priority,
   ) pass
 
-  # list of worksources and their respective enque time, each as a tuple
-  l = []
+  # return a bool indicating whether successfully enqueued or not
+  method enque(wsc) ai {
+    wsc.priority == this.priority |> error('bug: priority mismatch')
+    lingerThres = console.now() - this.lingers * 1e9
+
+    while this.length() > 0 case this.peekRight() of {( _wsc, qt )} -> {
+      if qt > lingerThres then { break }
+      this.popRight()
+    }
+    if this.length() >= this.prq.backlog then
+      return false  # queue still full
+    
+    this.pushLeft( (wsc, now) )
+    return true
+  }
 
 }
 

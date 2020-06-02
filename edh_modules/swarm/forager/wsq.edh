@@ -1,5 +1,6 @@
-
 # Worksource Queue implementation
+
+import (Deque, **_) 'swarm/RT'
 
 
 {#
@@ -58,9 +59,9 @@ class PRQ {
   generator streamOut() while true {
     ai {
       case this.pl of {
-        { crq => rest'pl } -> case crq.popLeft() of {
+        { crq => rest'pl } -> case crq.popFront() of {
           {( wsc, _qt )} -> {
-            if crq.length() < 1  # no more record at this priority
+            if null(crq)  # no more record at this priority
             then this.pl = rest'pl  # forget this crq
           }
           error('bug: empty CRQ in PRQ')
@@ -80,7 +81,7 @@ class PRQ {
 
   method enque(wsc) ai {
     crq = this.crq(wsc.priority)
-    if crq.pushLeft(wsc) then {
+    if crq.enque(wsc) then {
       this.iqd[wsc.key()] = wsc
       # increase & post queue change number
       this.qcn <- case mre(this.qcn) of { qcn } ->
@@ -133,16 +134,16 @@ class CRQ {
   # return a bool indicating whether successfully enqueued or not
   method enque(wsc) ai {
     wsc.priority == this.priority |> error('bug: priority mismatch')
-    lingerThres = console.now() - this.lingers * 1e9
+    lingerThres = console.now() - this.prq.lingers * 1e9
 
-    while this.length() > 0 case this.peekRight() of {( _wsc, qt )} -> {
+    while not null(this) case super.back() of {( _wsc, qt )} -> {
       if qt > lingerThres then { break }
-      this.popRight()
+      super.popBack()
     }
-    if this.length() >= this.prq.backlog then
+    if super.length() >= this.prq.backlog then
       return false  # queue still full
     
-    this.pushLeft( (wsc, now) )
+    super.pushFront( (wsc, now) )
     return true
   }
 

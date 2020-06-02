@@ -21,6 +21,7 @@ import qualified Data.HashMap.Strict           as Map
 import           Language.Edh.EHI
 import           Language.Edh.Net
 
+import           Language.Edh.Swarm.Deque
 import           Language.Edh.Swarm.Starter
 import           Language.Edh.Swarm.Worker
 
@@ -32,26 +33,33 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
     let moduScope = contextScope $ edh'context pgs
         modu      = thisObject moduScope
 
-    mths <- sequence
-      [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-      | (mc, nm, hp, args) <-
-        [ ( EdhMethod
-          , "wscTake"
-          , wscTakeProc
-          , PackReceiver
-            [RecvArg "wscFd" Nothing Nothing, RecvArg "peerObj" Nothing Nothing]
-          )
-        ]
-      ]
-    let !moduArts =
-          [ ("jobExecutable"  , EdhString executable)
-            , ("jobWorkDir"     , EdhString workDir)
-            , ("jobWorkModu"    , EdhString workModu)
-            , ("swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
-            , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
-            , ("wscFd"          , EdhDecimal $ fromIntegral wscFd)
-            ]
-            ++ mths
+    moduArts1 <-
+      sequence
+      $  [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+         | (mc, nm, hp, args) <-
+           [ ( EdhMethod
+             , "wscTake"
+             , wscTakeProc
+             , PackReceiver
+               [ RecvArg "wscFd"   Nothing Nothing
+               , RecvArg "peerObj" Nothing Nothing
+               ]
+             )
+           ]
+         ]
+      ++ [ (nm, ) <$> mkHostClass moduScope nm True hc
+         | (nm, hc) <- [("Deque", dequeHostCtor)]
+         ]
+    let moduArts =
+          moduArts1
+            ++ [ ("jobExecutable"  , EdhString executable)
+               , ("jobWorkDir"     , EdhString workDir)
+               , ("jobWorkModu"    , EdhString workModu)
+               , ("swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
+               , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
+               , ("wscFd"          , EdhDecimal $ fromIntegral wscFd)
+               ]
+
     artsDict <- createEdhDict
       $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]
     updateEntityAttrs pgs (objEntity modu)

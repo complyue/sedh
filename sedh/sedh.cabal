@@ -94,6 +94,7 @@ library sedh-internal
     exposed-modules:
         Language.Edh.Swarm.Starter
         Language.Edh.Swarm.Worker
+        Language.Edh.Swarm.Deque
     hs-source-dirs: src
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
@@ -111,6 +112,7 @@ library sedh-internal
         hashable -any,
         unordered-containers -any,
         containers -any,
+        dequeue -any,
         unix -any,
         directory -any,
         time -any,

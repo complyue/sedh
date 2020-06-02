@@ -63,8 +63,8 @@ class HeadHunter {
   }
 
   method __swarm_conn_init__() {
-    that.OfferHeads = OfferHeads
-    that.StartWorking = StartWorking
+    that.OfferHeads = this.OfferHeads
+    that.StartWorking = this.StartWorking
   }
 
   case Server (

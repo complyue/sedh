@@ -48,7 +48,6 @@ class PRQ {
   # list of CRQs sorted by priority
   pv = []
 
-
   # queue change number, ever increasing as each new ws enqueued
   qcn = sink
   qcn <- 0  # initialize to 0

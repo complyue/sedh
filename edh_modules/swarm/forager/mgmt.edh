@@ -5,11 +5,9 @@ import * 'swarm/RT'
 
 import * './wsq'
 
+
 # worksource connection, and the team of workers employed by it
 export class WSC {
-
-  hcEmployed = 0
-  workers = {}  # worker processes by pid
 
   method __init__ (
     forager as this.forager,
@@ -20,82 +18,127 @@ export class WSC {
     priority as this.priority,
   ) pass
 
+  # headcount reserved for this worksource
+  hcReserved = 0
+  # headcount hired by the worksource, updated from the worksource,
+  # as its demands changed
+  hcEmployed = sink
+
+  # all live worker processes by pid
+  workers = {}
+
   method __repr__() {
-    '<WorkTeamFor ' ++ this.addr ++ ' #' ++ this.hcEmployed ++ '>'
+    '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
+      ++ mre(this.hcEmployed) ++ '/' ++ this.hcReserved ++ '>'
   }
 
   method key() repr(this.addr)
 
-  peer = None
+  # connection to the worksource (headhunter) identified as a forager
+  peer := Peer()
 
   method engage (hcAvailable) {
-    ai {
-      this.hcEmployed = min(hcAvailable, this.hcPlanned)
-      this.forager.wsd[this.key()] = this
-    }
+    hcReserved = min(hcAvailable, this.hcPlanned)
 
-    { go {
-      method __init_nego__ () {
-        this.peer = that.peer
-        that.wsc = this
-      }
-      case Client(
-        this.forager.negoModu, this.addr, init=__init_nego__,
-      ) of -> { clnt } -> {
-        case clnt.addrs() of { addr =>_ } ->
-          console.debug<| 'Connected to worksource at: ' ++ addr
-        case clnt.eol() of {
-          false -> { pass }
-          clnt.join()  # this normally throws
-          error('connection to worksource failed')
+    {
+      go {
+        method __init_nego__ () {
+          this.peer = that.peer
+          that.wsc = this
         }
-      }
-      producer offerHeads(outlet) {
-        this.peer.postCommand(expr
-
-OfferHeads({$ swarmManagerPid $}, {$ this.hcEmployed $})
-
-        )
-        # wait until disconnected from worksource, then mark eos to stop
-        # the hc confirmation update loop, or stm deadlock would kill us
-        this.peer.join() @=> outlet <- nil
-      }
-      for hcComfirmed from offerHeads(this.peer.armChannel(dataChan)) do {
-        hcConfirmed < 0 -> error (
-          'Suspecious worksource confirming negative hc: ' ++ hcConfirmed
-        )
-        ai {
-          hcSpared = this.hcEmployed - hcConfirmed
-          hcSpared < 0 -> error (
-            'Suspecious worksource confirming excessive hc: ' ++ hcConfirmed
-          ) 
-          if hcSpared > 0 then {
-            this.hcEmployed -= hcSpared
-            this.forager.hcIdle <- hcSpared
+        case Client(
+          this.forager.negoModu, this.addr, init=__init_nego__,
+        ) of -> { clnt } -> {
+          case clnt.addrs() of { addr =>_ } ->
+            console.debug<| 'Connected to worksource at: ' ++ addr
+          case clnt.eol() of {
+            false -> { pass }
+            clnt.join()  # this normally throws
+            error('connection to worksource failed')
           }
         }
-        # TODO manage worker processes accordingly
+        producer offerHeads(outlet) {
+          this.peer.postCommand(expr
 
+  OfferHeads({$ swarmManagerPid $}, {$ hcReserved $})
+
+          )
+        }
+        offerHeads(this.peer.armChannel(dataChan, this.hcEmployed))
+
+        # start the team keeper, it'll subscribe to this.hcEmployed, thus
+        # trigger the offerHeads() producer
+        go this.teamKeeper()
+
+        # stop this wsc anyway the network connection is disconnected
+        clnt.join() @=> this.stop()
       }
-    } } $=> { exc } -> {  # this catches exceptions occurred directly or
+
+      # register this wsc
+      this.forager.wsd[this.key()] = this
+      # materialize the reservation
+      this.hcReserved = hcReserved
+    } $=> { exc } -> {  # this catches exceptions occurred directly or
       # in forked threads
       console.error<| 'Stopping team '++this++' on error: ' ++ exc
       this.stop()
     }
 
-    return this.hcEmployed
+    return this.hcReserved
+  }
+
+  # indicate whether this wsc is stopped
+  stopped := sink
+
+  # this method meant to be forked once per wsc
+  method teamKeeper() {
+    # terminate this thread on stop signal
+    perceive stopped { break }
+
+    hcEmployed = 0
+    go for hcConfirmed from this.hcEmployed do {
+      if hcConfirmed > this.hcReserved then error (
+        'Worksource ' ++ this.addr ' confirming ' ++ hcConfirmed 
+        ++ ' while only ' ++ this.hcReserved ++ ' reserved.'
+      )
+      # TODO any deal with the delta ?
+      hcEmployed = hcConfirmed
+    }
+    # wait the first confirmation
+    for _ from this.hcEmployed do { break }
+    # keep enough worker processes running
+    while this.workers.size < hcEmployed {
+      wkrp = ...
+
+      this.workers[pid] = wkrp
+    }
   }
 
   method stop() {
-    # TODO forcefully stop all workers for this worksource
+    this.hcEmployed <- nil
+    this.stopped <- nil
 
-    # check releash occupied heads
-    wsKey = this.key()
-    ai case this.forager.wsd[wsKey] of {
-      nil -> { pass }  # already unleashed, don't repeat doing
-      # releash headcount occupied by this team
-      this.forager.wsd[wsKey] = nil
-      this.forager.hcIdel <- this.hcEmployed
+    # forcefully stop all workers for this worksource
+    for (pid, wkrp) from this.workers do while true {
+      # TODO make sure this worker process is killed
+
+      this.workers[pid] = nil  # forget about it
+      break  # proceed only after kill confirmed, it's better to wait forever
+      # than exhausting the system by creating too many new worker processes
+    } $=> { exc } -> {
+      console.error<| 'Failed killing worker process pid=' ++ pid
+      # wait a second on error killing a worker process
+      for _ from console.everySeconds(1) do { break }
+    }
+
+    # check unleash heads reserved for this worksource
+    ai if this.hcReserved > 0 then {
+      this.forager.hcIdle <- this.hcReserved
+      this.hcReserved = 0
+    }
+    # forget about this worksource
+    ai case this.forager.wsd[this.key()] of this -> {
+      this.forager.wsd[this.key()] = nil
     }
   }
 

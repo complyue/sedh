@@ -143,35 +143,32 @@ class CRQ {
 
     qfull = this.wp == this.rp
     if qfull then {
-      let (wsc', qt) = this.l[this.wp]
-      if qt > lingerThres then  # queue full of lingering wsc
-          return false
+      let (wsc', qt) = this.l[this.rp]
+      # queue full of lingering wsc
+      if qt > lingerThres then return false
       # pushed out of queue
       this.prq.iqd[wsc'.key()] = nil
     }
     this.l[this.wp] = (wsc, t)
     this.prq.iqd[wsc.key()] = wsc
-    if this.rp < 0 then  # previously empty
-        this.rp = this.wp
-    this.wp += 1
-    if this.wp >= this.l.length then
-        this.wp = 0
-    if qfull then
-        this.rp = this.wp
+    # previously empty
+    if this.rp < 0 then this.rp = this.wp
+    this.wp += 1  # move the write pointer
+    if this.wp >= this.l.length then this.wp = 0
+    if qfull then this.rp = this.wp
 
     return true
   }
 
   method deq() ai {
-    if this.rp < 0:
-      return nil
+    # queue empty
+    if this.rp < 0 return nil
     let (wsc, qt) = this.l[this.rp]
     this.rp += 1
-    if this.rp >= this.l.length then
-      this.rp = 0
-    if this.rp == this.wp then {  # drained
-      this.rp = -1 this.wp = 0
-    }
+    if this.rp >= this.l.length then this.rp = 0
+    # drained
+    if this.rp == this.wp then this.rp = -1 this.wp = 0
+    # forget about it
     this.prq.iqd[wsc.key()] = nil
     return wsc
   }

@@ -1,8 +1,5 @@
 # Worksource Queue implementation
 
-import (Deque, **_) 'swarm/RT'
-
-
 {#
  # Prioritized Recent Queue
  #
@@ -49,7 +46,7 @@ class PRQ {
   # mapping addr key to worksources those in queue
   iqd = {}
   # list of CRQs sorted by priority
-  pl = []
+  pv = []
 
 
   # queue change number, ever increasing as each new ws enqueued
@@ -58,11 +55,11 @@ class PRQ {
 
   generator streamOut() while true {
     ai {
-      case this.pl of {
-        { crq => rest'pl } -> case crq.popFront() of {
+      case this.pv of {
+        { crq => rest'pv } -> case crq.deq() of {
           {( wsc, _qt )} -> {
-            if null(crq)  # no more record at this priority
-            then this.pl = rest'pl  # forget this crq
+            if crq.empty()  # no more record at this priority
+            then this.pv = rest'pv  # forget this crq
           }
           error('bug: empty CRQ in PRQ')
         }
@@ -81,7 +78,7 @@ class PRQ {
 
   method enque(wsc) ai {
     crq = this.crq(wsc.priority)
-    if crq.enque(wsc) then {
+    if crq.enq(wsc) then {
       this.iqd[wsc.key()] = wsc
       # increase & post queue change number
       this.qcn <- case mre(this.qcn) of { qcn } ->
@@ -92,24 +89,24 @@ class PRQ {
 
   method crq(priority) ai {
     higher = []
-    lower = this.pl
+    lower = this.pv
     while true case lower of {
-      { crq => rest'pl } -> {
+      { r => rest'pv } -> case r of {( p, crq )} -> {
         # already has a crq for this priority
-        if priority == crq.priority then return crq
-        if priority  > crq.priority then {
-          # found the insert position for this priority
-          crq = CRQ(this, priority)
-          this.pl = higher >> (crq => lower)
+        if priority == p then return crq
+        # found the insert position for this priority
+        if priority  > p then {
+          crq = CRQ(this)
+          this.pv = higher >> ((priority, crq) => lower)
           return crq
         }
         # priority is lower
-        crq => higher
-        lower = rest'pl
+        r => higher
+        lower = rest'pv
       }
       # create a crq with lowest priority
-      crq = CRQ(this, priority)
-      this.pl = higher >> (crq => lower)
+      crq = CRQ(this)
+      this.pv = higher >> ((priority, crq) => lower)
       return crq
     }
   }
@@ -119,32 +116,64 @@ class PRQ {
 
 {#
  # Capped Recent Queue
+ #
+ # a queue of constant capacity specified at construction
+ #
+ # enq() returns false when queue is full of lingering ws
+ # deq() returns nil when no item in queue
  #}
 class CRQ {
 
-  # queue of worksources and their respective enque time,
-  # each record being a tuple
-  extends Deque()
+  method __init__ ( prq as this.prq ) {
+    # queue of worksources and their respective enque time,
+    # each record being a tuple
+    this.l = MVector(length=this.prq.backlog)
+  }
 
-  method __init__(
-    prq as this.prq,
-    priority as this.priority,
-  ) pass
+  rp = -1 wp = 0
+
+  method empty() this.rp < 0
+
+  method full() this.rp == this.wp
 
   # return a bool indicating whether successfully enqueued or not
-  method enque(wsc) ai {
-    wsc.priority == this.priority |> error('bug: priority mismatch')
-    lingerThres = console.now() - this.prq.lingers * 1e9
+  method enq(wsc) ai {
+    t = console.now()
+    lingerThres = t - this.prq.lingers * 1e9
 
-    while not null(this) case super.back() of {( _wsc, qt )} -> {
-      if qt > lingerThres then { break }
-      super.popBack()
+    qfull = this.wp == this.rp
+    if qfull then {
+      let (wsc', qt) = this.l[this.wp]
+      if qt > lingerThres then  # queue full of lingering wsc
+          return false
+      # pushed out of queue
+      this.prq.iqd[wsc'.key()] = nil
     }
-    if super.length() >= this.prq.backlog then
-      return false  # queue still full
-    
-    super.pushFront( (wsc, now) )
+    this.l[this.wp] = (wsc, t)
+    this.prq.iqd[wsc.key()] = wsc
+    if this.rp < 0 then  # previously empty
+        this.rp = this.wp
+    this.wp += 1
+    if this.wp >= this.l.length then
+        this.wp = 0
+    if qfull then
+        this.rp = this.wp
+
     return true
+  }
+
+  method deq() ai {
+    if this.rp < 0:
+      return nil
+    let (wsc, qt) = this.l[this.rp]
+    this.rp += 1
+    if this.rp >= this.l.length then
+      this.rp = 0
+    if this.rp == this.wp then {  # drained
+      this.rp = -1 this.wp = 0
+    }
+    this.prq.iqd[wsc.key()] = nil
+    return wsc
   }
 
 }

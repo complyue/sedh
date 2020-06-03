@@ -24,6 +24,14 @@ extends {
 }
 
 
+dataSink = peer.armChannel(dataChan)
+
+effect {
+  ;@netPeer = peer
+  ;@dataSink = dataSink
+}
+
+
 # identify this connection as swarm worker to the headhunter, then it will
 # start sending ips to our data channel
 producer initiateJobs(outlet) {
@@ -35,9 +43,7 @@ StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
 }
 
 # apks are expected to be posted to a worker's data channel, one by one
-for ips from initiateJobs( outlet=peer.armChannel(dataChan) ) do {
-
-;-1<|'xx'
+go for ips from initiateJobs( outlet=dataSink ) do {
 
   console.debug<| 'Computing ips: ' ++ ips
 
@@ -54,4 +60,23 @@ for ips from initiateJobs( outlet=peer.armChannel(dataChan) ) do {
     break  # stop processing more jobs
   }
 
+}
+
+
+{
+
+  while false == peer.eol() case peer.readCommand() of {
+    # note a command resulting in nil is ignored here
+    { cmdVal } -> {
+      console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
+      cmdVal = nil  # clear it
+    }
+  }
+
+} @=> {
+  { exc } -> {
+    console.error<| 'Disconnecting worker from worksource ' ++ peer
+      ++ ' for error: ' ++ exc
+  }
+  console.debug<| 'Disconnecting worker from worksource ' ++ peer
 }

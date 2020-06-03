@@ -100,6 +100,26 @@ wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, EdhStrin
 wscStartWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 
+killWorkerProc :: EdhProcedure
+killWorkerProc (ArgsPack [EdhDecimal !wkrPid] !kwargs) !exit | Map.null kwargs =
+  case D.decimalToInteger wkrPid of
+    Nothing   -> throwEdh UsageError $ "Invalid pid: " <> T.pack (show wkrPid)
+    Just !pid -> ask >>= \pgs ->
+      contEdhSTM $ edhPerformIO pgs (confirmKill $ fromIntegral pid) $ \() ->
+        exitEdhProc exit nil
+ where
+  confirmKill :: ProcessID -> IO ()
+  -- assuming failure means the process by this pid doesn't exist (anymore)
+  -- todo improve such confirmation criteria
+  confirmKill !pid = handle (\(_ :: SomeException) -> return ()) $ do
+    signalProcess killProcess pid
+    threadDelay 100000  -- wait 0.1 second before checking it's actually killed
+    signalProcess nullSignal pid
+    threadDelay 3000000  -- wait 3 seconds before try another round
+    confirmKill pid
+killWorkerProc _ _ = throwEdh UsageError "Invalid args"
+
+
 wscTakeProc :: EdhProcedure
 wscTakeProc (ArgsPack [EdhDecimal !wscFd, EdhObject !peerObj] !kwargs) !exit
   | Map.null kwargs = do

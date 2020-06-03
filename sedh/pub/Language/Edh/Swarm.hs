@@ -56,6 +56,11 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
         $  [ (nm, ) <$> mkHostProc moduScope mc nm hp args
            | (mc, nm, hp, args) <-
              [ ( EdhMethod
+               , "killWorker"
+               , killWorkerProc
+               , PackReceiver [RecvArg "pid" Nothing Nothing]
+               )
+             , ( EdhMethod
                , "wscTake"
                , wscTakeProc
                , PackReceiver

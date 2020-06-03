@@ -133,9 +133,9 @@ export class WSC {
         case wscStartWorker(
           this.addr,
           senv.jobWorkDir, senv.jobExecutable, senv.jobWorkModu,
-        ) of { wkrpid } -> {
-          this.workers[wkrpid] = this
-          this.forager.workers <- pkargs(wkrpid, this)
+        ) of { wkrPid } -> {
+          this.workers[wkrPid] = this
+          this.forager.workers <- pkargs(wkrPid, this)
         }
       }
     }
@@ -143,12 +143,12 @@ export class WSC {
 
   method stop() {
     this.hcEmployed <- nil
-    this.stopped <- nil
+    this.stopped <- true
 
     # forcefully stop all workers for this worksource
-    for (pid, wkrp) from this.workers do while true {
-      # TODO make sure this worker process is killed
-
+    for (pid, _) from this.workers do while true {
+      # make sure this worker process is killed
+      killWorker(pid)
       this.workers[pid] = nil  # forget about it
       break  # proceed only after kill confirmed, it's better to wait forever
       # than exhausting the system by creating too many new worker processes
@@ -243,7 +243,7 @@ export class Forager {
 
     # maintain mapping from pid of live worker processes to its team manager
     workers = {}
-    go for (wkrpid, wsc) from this.workerStarted do workers[wkrpid] = wsc
+    go for (wkrPid, wsc) from this.workerStarted do workers[wkrPid] = wsc
 
     # track done of worker processes
     go for _ from this.workerStarted do case waitAnyWorkerDone()

@@ -54,10 +54,11 @@ export class PRQ {
   generator streamOut() while true {
     ai {
       case this.pv of {
-        { crq => rest'pv } -> case crq.deq() of {
-          {( wsc, _qt )} -> {
-            if crq.empty()  # no more record at this priority
-            then this.pv = rest'pv  # forget this crq
+        { pcrq => rest'pv } -> case pcrq of {( _priority, crq )}
+        -> case crq.deq() of {
+          { wsc } -> if crq.empty() then {
+            # no more record at this priority
+            this.pv = rest'pv  # forget this crq
           }
           error('bug: empty CRQ in PRQ')
         }
@@ -70,19 +71,21 @@ export class PRQ {
       yield wsc  # engagement with this worksource expected
       continue
     }
-    for qcn from this.qcn do  # wait until queue changed
+    for qcn from this.qcn do {  # wait until queue changed
       qcn != seen'qcn -> { break }
+    }
   }
 
   method enque(wsc) ai {
     crq = this.crq(wsc.priority)
-    if crq.enq(wsc) then {
+    crq.enq(wsc) -> {
       this.iqd[wsc.key()] = wsc
       # increase & post queue change number
-      this.qcn <- case mre(this.qcn) of { qcn } ->
-        # do with some wrapback, don't grow the number too big
-        if qcn >= 1e6 then 1 else qcn+1
+      qcn = mre(this.qcn)
+      # do with some wrapback, don't grow the number too big
+      this.qcn <- if qcn >= 1e6 then 1 else qcn+1
     }
+    console.warn<| 'Worksource backlog queue full, dropping ' ++ wsc
   }
 
   method crq(priority) ai {
@@ -161,7 +164,10 @@ class CRQ {
   method deq() ai {
     # queue empty
     if this.rp < 0 then { return nil }
-    let (wsc, qt) = this.l[this.rp]
+    case this.l[this.rp] of {
+      {( wsc, _qt )} -> { pass }
+      error('impossible')
+    }
     this.rp += 1
     if this.rp >= this.l.length then this.rp = 0
     # drained

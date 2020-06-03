@@ -28,6 +28,10 @@ forager ?:= Forager()
 import * forager
 
 
+# start the forager's scheduling work
+go forager.scheduleTeams()
+
+
 # mocking artifacts those should have been implanted by host
 # module preparation, to give meaningful information to IDEs
 # and/or other tools, for purpose of, e.g. code completion.

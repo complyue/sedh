@@ -226,6 +226,8 @@ export class Forager {
         }
       }
     }
+
+    return nil
   }
 
   # available headcounts to be offered

@@ -102,8 +102,29 @@ export class HeadHunter {
   workerAvailable = sink
   idleWorkers = []
   pendingJobs = []
+  allDone = sink
 
-  method __init__( resultSink as this.resultSink ) pass
+  method __init__( resultSink as this.resultSink ) go {
+    perceive this.allDone { break }
+
+    # advertise call-for-workers when there's demand
+    # TODO make the check interval tunable
+    for _ from console.everySeconds(3, wait1st=false)
+    do (hcDemand = this.headcount - this.hcEmployed) > 0 -> {
+      console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
+        ++ cfw.addrs()
+      cfw.post(expr
+
+WorkToDo(
+  {$ hcDemand $},
+  {$ senv.jobExecutable $},
+  {$ senv.jobWorkDir $},
+  {$ priority $},
+)
+
+      )
+    }
+  }
 
   method trackJob(worker, ips) {
     # arm new private data/err channels to this job
@@ -176,21 +197,9 @@ export class HeadHunter {
         }
         this.hcEmployed = hcEmployed
 
-        # advertise call-for-workers if there's demand
-        if (hcDemand = this.headcount - this.hcEmployed) > 0
-        then cfw.post(expr
-
-WorkToDo(
-  {$ hcDemand $},
-  {$ senv.jobExecutable $},
-  {$ senv.jobWorkDir $},
-  {$ priority $},
-)
-
-          )
         # wait until new idle workers appear
-        for _ from this.workerAvailable do
-        if not null(this.idleWorkers) then { break }
+        for _ from this.workerAvailable do not null(this.idleWorkers)
+        -> { break }
       }
     }
   }

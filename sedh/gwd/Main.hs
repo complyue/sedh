@@ -48,14 +48,14 @@ main = do
             runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
               Left !err -> atomically $ do
                 -- program crash on error
-                consoleOut "Edh swarm forager crashed with an error:\n"
+                consoleOut "Edh swarm gwd crashed with an error:\n"
                 consoleOut $ T.pack $ show err <> "\n"
               Right !phv -> case edhUltimate phv of
                 -- clean program halt, all done
                 EdhNil -> return ()
                 -- unclean program exit
                 _      -> atomically $ do
-                  consoleOut "Edh swarm forager halted with a result:\n"
+                  consoleOut "Edh swarm gwd halted with a result:\n"
                   consoleOut $ (<> "\n") $ case phv of
                     EdhString msg -> msg
                     _             -> T.pack $ show phv

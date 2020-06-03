@@ -33,14 +33,13 @@
  # 	this implementation assumes that there're not too many priority
  # 	levels, or it'll perform rather inefficiently.
  #}
-class PRQ {
+export class PRQ {
 
   method __init__(
     # the lease seconds a task should be kept in queue
-    lingers as this.lingers,
-
+    lingers as this.lingers = 5*60,  # 5 minutes by default
     # the max number of records should be kept in queue
-    backlog as this.backlog,
+    backlog as this.backlog = 50,  # 50 by default
   ) pass
 
   # mapping addr key to worksources those in queue
@@ -92,7 +91,7 @@ class PRQ {
     while true case lower of {
       { r => rest'pv } -> case r of {( p, crq )} -> {
         # already has a crq for this priority
-        if priority == p then return crq
+        if priority == p then { return crq }
         # found the insert position for this priority
         if priority  > p then {
           crq = CRQ(this)
@@ -144,7 +143,7 @@ class CRQ {
     if qfull then {
       let (wsc', qt) = this.l[this.rp]
       # queue full of lingering wsc
-      if qt > lingerThres then return false
+      if qt > lingerThres then { return false }
       # pushed out of queue
       this.prq.iqd[wsc'.key()] = nil
     }
@@ -161,7 +160,7 @@ class CRQ {
 
   method deq() ai {
     # queue empty
-    if this.rp < 0 return nil
+    if this.rp < 0 then { return nil }
     let (wsc, qt) = this.l[this.rp]
     this.rp += 1
     if this.rp >= this.l.length then this.rp = 0

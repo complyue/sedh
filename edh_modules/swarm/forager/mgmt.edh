@@ -54,7 +54,7 @@ export class WSC {
         }
         case Client(
           this.forager.negoModu, this.addr, init=__init_nego__,
-        ) of -> { clnt } -> {
+        ) of { clnt } -> {
           case clnt.addrs() of { addr =>_ } ->
             console.debug<| 'Connected to worksource at: ' ++ addr
           case clnt.eol() of {
@@ -146,16 +146,10 @@ export class WSC {
     this.stopped <- true
 
     # forcefully stop all workers for this worksource
-    for (pid, _) from this.workers do while true {
+    for (pid, _) from this.workers do {
       # make sure this worker process is killed
       killWorker(pid)
       this.workers[pid] = nil  # forget about it
-      break  # proceed only after kill confirmed, it's better to wait forever
-      # than exhausting the system by creating too many new worker processes
-    } $=> { exc } -> {
-      console.error<| 'Failed killing worker process pid=' ++ pid
-      # wait a second on error killing a worker process
-      for _ from console.everySeconds(1) do { break }
     }
 
     # check unleash heads reserved for this worksource
@@ -250,13 +244,13 @@ export class Forager {
     of { donePid:doneAct:doneDesc } -> {
       console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
-      case workers[donePid] of { doneWSC } -> ai {
-        # uncount the team's number of working heads
+      case workers[donePid] of { doneWSC } -> { ai {
+        # uncount this one from the team's number of working heads
         doneWSC.workers[donePid] = nil
         # request reform of the team
         doneWSC.reformNumber <- mre(doneWSC.reform) + 1
         workers[donePid] = nil  # forget about it
-      }
+      } }
     }
 
     hcCum = 0 nsLastIdle = 0

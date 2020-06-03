@@ -3,8 +3,13 @@ import * 'net'
 
 import * 'swarm/RT'
 
+# work definition scripts are allowed to change the inferred
+# configuration at 'swarm/ENV', import it as a namespace to
+# always use up-to-date artifacts living there
+case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
 
-class HeadHunter {
+
+export class HeadHunter {
 
   # fetch effective configurations, cache as instance attribute
   priority = perform priority
@@ -177,7 +182,8 @@ class HeadHunter {
 
 WorkToDo(
   {$ hcDemand $},
-  {$ jobExecutable $},
+  {$ senv.jobExecutable $},
+  {$ senv.jobWorkDir $},
   {$ priority $},
 )
 

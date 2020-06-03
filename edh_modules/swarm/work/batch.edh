@@ -10,7 +10,7 @@ export producer manageBatchJobs(
   params,  # generator or producer providing all ips
   outlet,  # our producing target sink
 ) {
-  hh = HeadHunter(outlet)
+  case HeadHunter(outlet) of { hh } -> { pass }
   for ips from params() do {
     case type(ips) of {  # ensure ips of apk type
       ArgsPackType -> { pass }

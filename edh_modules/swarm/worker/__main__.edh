@@ -3,21 +3,23 @@
 #
 
 import * 'net'
-import * 'swarm/symbols'
 
-import (
-  jobWorkModu, swarmManagerPid, swarmWorkerPid,
-  wscFd, wscTake,
-**_) 'swarm/RT'
+import * 'swarm/symbols'
+import * 'swarm/RT'
+
+# work definition scripts are allowed to change the inferred
+# configuration at 'swarm/ENV', import it as a namespace to
+# always use up-to-date artifacts living there
+case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
 
 
 # take the worksource connection file describer, make it a peer for comm
-peer = wscTake(wscFd, Peer())
+peer = wscTake(senv.wscFd, Peer())
 
 
 # inherit the work module, so we have access to `@doOneJob` implemented there
 extends {
-  import (**_) jobWorkModu
+  import (**_) senv.jobWorkModu
 }
 
 
@@ -26,7 +28,7 @@ extends {
 producer initiateJobs(outlet) {
   peer.postCommand(expr
 
-StartWorking({$ swarmWorkerPid $}, {$ swarmManagerPid $})
+StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
 
   )
 }
@@ -39,8 +41,8 @@ do case this.@doOneJob(***ips) of {
   }
   throw UsageError('Swarm job returned no result', ips=ips)
 } $=> { jobExc } -> {
-  console.error<| 'Swarm job [' ++ jobWorkModu ++ ' - [' 
-    ++ swarmManagerPid ++ '/' ++ swarmWorkerPid, '] failure:\n'
+  console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - [' 
+    ++ senv.swarmManagerPid ++ '/' ++ senv.swarmWorkerPid, '] failure:\n'
     ++ jobExc
   peer.p2c(errChan, repr(jobExc))
   break

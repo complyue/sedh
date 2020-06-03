@@ -40,16 +40,12 @@ export class WSC {
 
   method key() repr(this.addr)
 
-  # connection to the worksource (headhunter) identified as a forager
-  peer := Peer()
-
   method engage (hcAvailable) {
-    hcReserved = min(hcAvailable, this.hcPlanned)
+    this.hcReserved = min(hcAvailable, this.hcPlanned)
 
     {
       go {
         method __init_nego__ () {
-          this.peer = that.peer
           that.wsc = this
         }
         case Client(
@@ -63,18 +59,6 @@ export class WSC {
             error('connection to worksource failed')
           }
         }
-        producer offerHeads(outlet) {
-          this.peer.postCommand(expr
-
-  OfferHeads({$ swarmManagerPid $}, {$ hcReserved $})
-
-          )
-        }
-        offerHeads(this.peer.armChannel(dataChan, this.hcEmployed))
-
-        # start the team keeper, it'll subscribe to this.hcEmployed, thus
-        # trigger the offerHeads() producer
-        go this.teamKeeper()
 
         # stop this wsc anyway the network connection is disconnected
         clnt.join() @=> this.stop()
@@ -82,8 +66,6 @@ export class WSC {
 
       # register this wsc
       this.forager.wsd[this.key()] = this
-      # materialize the reservation
-      this.hcReserved = hcReserved
     } $=> { exc } -> {  # this catches exceptions occurred directly or
       # in forked threads
       console.error<| 'Stopping team '++this++' on error: ' ++ exc
@@ -117,7 +99,7 @@ export class WSC {
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
       ai {  # request reform
-        this.reformNumber <- mre(this.reform) + 1
+        this.reformNumber <- mre(this.reformNumber) + 1
       }
     }
 
@@ -255,29 +237,33 @@ export class Forager {
       } }
     }
 
-    hcCum = 0 nsLastIdle = 0
-    # let it start out to be the configured total headcount,  there won't
-    # be further post to it until some heads are offered then unleashed
-    this.hcIdle <- this.headcount
+    # start out to have the configured total headcount available
+    hcCum = this.headcount nsLastIdle = 0
     # collect idle heads in a dedicated thread, to not miss any unleash
     go for hcNewIdle from this.hcIdle do {
       hcNewIdle < 1 -> { continue }
       nsLastIdle = console.now()
       hcCum += hcNewIdle
     }
-    # insert some zero counts periodicly, so the check in following loop won't
-    # dead wait in case it can only partial fill for a long time
+    # insert some zero idle counts periodicly, so the check in following loop
+    # won't dead wait in case it can only partial fill for a long time
     go for _ from console.everySeconds(1) do this.hcIdle <- 0
 
     # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
-      # wait until got fulfilling free heads, or waited long enough while
-      # partial filling is possible
-      # TODO make the hardcoded 5 seconds tunable
-      for _ from this.hcIdle do
+      console.debug<| 'Discovered new worksource: ' ++ wsc
+
+      # do wait if can not immediately fulfill all the heads
+      if hcCum < this.headcount && hcCum < wsc.hcPlanned
+      then for _ from this.hcIdle do
+        # can fulfill now
         (hcCum >= wsc.hcPlanned || hcCum >= this.headcount)
+        # or waited long enough while partial filling is possible
+        # TODO make the hardcoded 5 seconds tunable
         || (hcCum > 0 && console.now() - nsLastIdle > 5e9)
         -> { break }
+
+      console.debug<| 'Engaging worksource with ' ++ hcCum ++ ' heads to offer.'
 
       # engage with this worksource with as many free heads atm
       # `engage()` should return quickly without waiting for network,

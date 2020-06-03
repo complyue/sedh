@@ -16,11 +16,10 @@ export class HeadHunter {
   headcount = perform headcount
 
   class Forager {
-    hcEmployed = None
+    hcEmployed = 0
     hcWorking = 0
     method __init__(
-      peer as this.peer, pid as this.pid,
-      maxHC as this.maxHC,
+      peer as this.peer, pid as this.pid, maxHC as this.maxHC,
     ) pass
   }
 
@@ -30,6 +29,8 @@ export class HeadHunter {
     }
   }
 
+  hcEmployed = 0  # total heads employed by this HH
+
   # a swarm node connection identifying itself as a forager
   method OfferHeads(
     foragerPid, maxHC, 
@@ -37,13 +38,12 @@ export class HeadHunter {
     ai {  # calculate number of employment atomically
       hcDemand = this.headcount - this.hcEmployed
       hcToEmploy = min(maxHC, hcDemand)
-      if hcToEmploy >= 1
-        then this.hcEmployed += hcToEmploy
     }
     hcToEmploy < 1 -> {  # no demand, disconnect
       # todo send zero employment ?
       that.peer.stop()
     }
+
     # employ heads from this forager
     ai case this.foragers[that.peer] of {
       nil -> this.foragers[that.peer] = (forager = Forager(
@@ -58,12 +58,16 @@ export class HeadHunter {
       # todo could this possibily exceed its maxHC ?
       forager.hcEmployed += hcToEmploy
     ))
+
+    return nil
   }
 
   # a swarm node connection identifying itself as a worker
   method StartWorking(
     workerPid, foragerPid,
   ) {
+    console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
+      ++ foragerPid ++ ' @ ' ++ that.peer.ident() ++ ' start working.'
     this.workerAvailable <- Worker(that.peer) => this.idleWorkers
   }
 
@@ -97,7 +101,6 @@ export class HeadHunter {
   ) of { cfw } -> { pass }
 
   # data structures for job scheduling
-  hcEmployed = 0
   foragers = {}
   workerAvailable = sink
   idleWorkers = []
@@ -106,14 +109,25 @@ export class HeadHunter {
 
   method __init__( resultSink as this.resultSink ) go {
     perceive this.allDone { break }
-
     # advertise call-for-workers when there's demand
     # TODO make the check interval tunable
-    for _ from console.everySeconds(3, wait1st=false)
-    do (hcDemand = this.headcount - this.hcEmployed) > 0 -> {
-      console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
-        ++ cfw.addrs()
-      cfw.post(expr
+    for _ from console.everySeconds(3, wait1st=false) do {
+      # calibrate this.hcEmployed, wrt forager disconnection etc.
+      hcEmployed = 0
+      for (peer, forager) from this.foragers do {
+        if false != peer.eol() then {
+          this.foragers[peer] = nil  # forget about it
+        }
+        hcEmployed += forager.hcEmployed
+      }
+      this.hcEmployed = hcEmployed
+
+      console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed atm.'
+
+      if (hcDemand = this.headcount - hcEmployed) > 0 then {
+        console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
+          ++ cfw.addrs()
+        cfw.post(expr
 
 WorkToDo(
   {$ hcDemand $},
@@ -122,7 +136,8 @@ WorkToDo(
   {$ priority $},
 )
 
-      )
+        )
+      }
     }
   }
 
@@ -186,16 +201,6 @@ WorkToDo(
           # start asynchronous concurrency
           go trackJob(worker, ips)
         }
-
-        # calibrate this.hcEmployed, wrt forager disconnection etc.
-        hcEmployed = 0
-        for (peer, forager) from this.foragers do {
-          if false != peer.eol() then {
-            this.foragers[peer] = nil  # forget it
-          }
-          hcEmployed += forager.hcEmployed
-        }
-        this.hcEmployed = hcEmployed
 
         # wait until new idle workers appear
         for _ from this.workerAvailable do not null(this.idleWorkers)

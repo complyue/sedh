@@ -1,9 +1,15 @@
 
 # this is the worksource facing entry module of an Edh swarm forager
 
-import (Peer, **_) 'net/RT'
 import * 'net/symbols'
 effect import * 'net/effects'
+
+import (Peer, **_) 'net/RT'
+
+# work definition scripts are allowed to change the inferred
+# configuration at 'swarm/ENV', import it as a namespace to
+# always use up-to-date artifacts living there
+case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
 
 import * 'swarm/forager/mgmt'
 
@@ -23,6 +29,19 @@ effect {
   ;@netPeer = peer
   ;@dataSink = peer.armChannel(dataChan)
 }
+
+
+producer offerHeads(outlet) {
+  peer.postCommand(expr
+
+OfferHeads({$ senv.swarmManagerPid $}, {$ wsc.hcReserved $})
+
+  )
+}
+offerHeads(outlet=peer.armChannel(dataChan, wsc.hcEmployed))
+# start the team keeper, it'll subscribe to wsc.hcEmployed, thus
+# trigger the offerHeads() producer
+go wsc.teamKeeper()
 
 
 {

@@ -26,7 +26,7 @@ effect swarmPort = 3722
 # control work priority and maximum number of worker processes
 # we hire from the swarm
 effect priority = 0
-effect headcount = 10
+effect headcount = 1
 
 
 # exported to override what's in the definition module scope,

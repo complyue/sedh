@@ -96,6 +96,8 @@ export class WSC {
         'Worksource ' ++ this.addr ' confirming ' ++ hcConfirmed 
         ++ ' while only ' ++ this.hcReserved ++ ' reserved.'
       )
+      console.debug<| 'Worksource ' ++ this.addr ++ ' confirmed '
+        ++ hcConfirmed ++ ' heads employed.'
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
       ai {  # request reform
@@ -106,9 +108,8 @@ export class WSC {
     # do reform upon appropriate chances
     while true {
       # wait next chance to reform
-      for rfn' from this.reformNumber do rfn' != rfn -> {
-        rfn = rfn'
-        break
+      for rfn' from this.reformNumber do {
+        rfn' != rfn -> { rfn = rfn' break }
       }
       # keep enough worker processes running
       while this.workers.size < hcEmployed {
@@ -117,7 +118,7 @@ export class WSC {
           senv.jobWorkDir, senv.jobExecutable, senv.jobWorkModu,
         ) of { wkrPid } -> {
           this.workers[wkrPid] = this
-          this.forager.workers <- pkargs(wkrPid, this)
+          this.forager.workerStarted <- pkargs(wkrPid, this)
         }
       }
     }
@@ -224,7 +225,7 @@ export class Forager {
     go for (wkrPid, wsc) from this.workerStarted do workers[wkrPid] = wsc
 
     # track done of worker processes
-    go for _ from this.workerStarted do case waitAnyWorkerDone()
+    go for (***_) from this.workerStarted do case waitAnyWorkerDone()
     of { donePid:doneAct:doneDesc } -> {
       console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
@@ -232,7 +233,7 @@ export class Forager {
         # uncount this one from the team's number of working heads
         doneWSC.workers[donePid] = nil
         # request reform of the team
-        doneWSC.reformNumber <- mre(doneWSC.reform) + 1
+        doneWSC.reformNumber <- mre(doneWSC.reformNumber) + 1
         workers[donePid] = nil  # forget about it
       } }
     }

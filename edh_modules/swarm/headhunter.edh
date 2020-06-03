@@ -54,10 +54,11 @@ export class HeadHunter {
         forager.maxHC = maxHC
       }
     }
-    that.peer.p2c(dataChan, repr(
-      # todo could this possibily exceed its maxHC ?
-      forager.hcEmployed += hcToEmploy
-    ))
+    # todo could this possibily exceed its maxHC ?
+    forager.hcEmployed += hcToEmploy
+    console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
+      ++ that.peer.ident() ++ ' now.'
+    that.peer.p2c(dataChan, repr(forager.hcEmployed))
 
     return nil
   }

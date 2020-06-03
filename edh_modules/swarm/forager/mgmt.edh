@@ -3,7 +3,13 @@ import * 'net'
 
 import * 'swarm/RT'
 
+# work definition scripts are allowed to change the inferred
+# configuration at 'swarm/ENV', import it as a namespace to
+# always use up-to-date artifacts living there
+case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
+
 import * './wsq'
+
 
 
 # worksource connection, and the team of workers employed by it
@@ -87,14 +93,21 @@ export class WSC {
     return this.hcReserved
   }
 
-  # indicate whether this wsc is stopped
+  # stop signal for this wsc
   stopped := sink
+
+  # ever increasing number to track reform bumps
+  reformNumber := sink
+  reformNumber <- 0  # initialize to 0
 
   # this method meant to be forked once per wsc
   method teamKeeper() {
     # terminate this thread on stop signal
     perceive stopped { break }
 
+    rfn = mre(this.reformNumber)
+
+    # track delta of employment
     hcEmployed = 0
     go for hcConfirmed from this.hcEmployed do {
       if hcConfirmed > this.hcReserved then error (
@@ -103,14 +116,28 @@ export class WSC {
       )
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
+      ai {  # request reform
+        this.reformNumber <- mre(this.reform) + 1
+      }
     }
-    # wait the first confirmation
-    for _ from this.hcEmployed do { break }
-    # keep enough worker processes running
-    while this.workers.size < hcEmployed {
-      wkrp = ...
 
-      this.workers[pid] = wkrp
+    # do reform upon appropriate chances
+    while true {
+      # wait next chance to reform
+      for rfn' from this.reformNumber do rfn' != rfn -> {
+        rfn = rfn'
+        break
+      }
+      # keep enough worker processes running
+      while this.workers.size < hcEmployed {
+        case wscStartWorker(
+          this.addr,
+          senv.jobWorkDir, senv.jobExecutable, senv.jobWorkModu,
+        ) of { wkrpid } -> {
+          this.workers[wkrpid] = this
+          this.forager.workers <- pkargs(wkrpid, this)
+        }
+      }
     }
   }
 
@@ -157,19 +184,17 @@ export class WSC {
 
 export class Forager {
 
-  # available headcounts to be offered
-  hcIdle = sink
-  # prioritized recent queue for backlog of worksources
-  wsq = PRQ()
-  # worksources currently being actively worked on
-  wsd = {}
-
   method __init__(
     headcount as this.headcount,
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
     this.headcount >= 1 |> error('Invalid headcount: '++this.headcount)
   }
+
+  # prioritized recent queue for backlog of worksources
+  wsq = PRQ()
+  # worksources currently being actively worked on
+  wsd = {}
 
   # A work source (e.g. a head hunter) should announce call-for-workers
   # in this format, and this intends to be exposed (imported) by a network
@@ -209,7 +234,31 @@ export class Forager {
     }
   }
 
+  # available headcounts to be offered
+  hcIdle = sink
+  # stream of `pid:wsc` for ever started worker processes 
+  workerStarted = sink
+
   method scheduleTeams() {
+
+    # maintain mapping from pid of live worker processes to its team manager
+    workers = {}
+    go for (wkrpid, wsc) from this.workerStarted do workers[wkrpid] = wsc
+
+    # track done of worker processes
+    go for _ from this.workerStarted do case waitAnyWorkerDone()
+    of { donePid:doneAct:doneDesc } -> {
+      console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
+        ++ ' - ' ++ doneDesc
+      case workers[donePid] of { doneWSC } -> ai {
+        # uncount the team's number of working heads
+        doneWSC.workers[donePid] = nil
+        # request reform of the team
+        doneWSC.reformNumber <- mre(doneWSC.reform) + 1
+        workers[donePid] = nil  # forget about it
+      }
+    }
+
     hcCum = 0 nsLastIdle = 0
     # let it start out to be the configured total headcount,  there won't
     # be further post to it until some heads are offered then unleashed
@@ -220,10 +269,11 @@ export class Forager {
       nsLastIdle = console.now()
       hcCum += hcNewIdle
     }
-    # insert some zero counts, so the check in following loop won't dead
-    # wait in case it can only partial fill for a long time
+    # insert some zero counts periodicly, so the check in following loop won't
+    # dead wait in case it can only partial fill for a long time
     go for _ from console.everySeconds(1) do this.hcIdle <- 0
 
+    # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
       # wait until got fulfilling free heads, or waited long enough while
       # partial filling is possible
@@ -239,6 +289,7 @@ export class Forager {
       # assignment
       hcCum -= wsc.engage(hcCum)
     }
+
   }
 
 }

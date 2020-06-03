@@ -28,55 +28,69 @@ import           Language.Edh.Swarm.Worker
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
 installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid workerPid wscFd) !world
-  = void $ installEdhModule world "swarm/RT" $ \pgs exit -> do
+  = do
 
-    let moduScope = contextScope $ edh'context pgs
-        modu      = thisObject moduScope
+    void $ installEdhModule world "swarm/ENV" $ \pgs exit -> do
 
-    moduArts1 <-
-      sequence
-      $  [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-         | (mc, nm, hp, args) <-
-           [ ( EdhMethod
-             , "wscTake"
-             , wscTakeProc
-             , PackReceiver
-               [ RecvArg "wscFd"   Nothing Nothing
-               , RecvArg "peerObj" Nothing Nothing
-               ]
-             )
-           , ( EdhMethod
-             , "wscStartWorker"
-             , wscStartWorkerProc
-             , PackReceiver
-               [ RecvArg "wsAddr"     Nothing Nothing
-               , RecvArg "workDir"    Nothing Nothing
-               , RecvArg "executable" Nothing Nothing
-               , RecvArg "workModu"   Nothing Nothing
-               ]
-             )
+      let moduScope = contextScope $ edh'context pgs
+          modu      = thisObject moduScope
+      updateEntityAttrs
+        pgs
+        (objEntity modu)
+        [ (AttrByName "jobExecutable"  , EdhString executable)
+        , (AttrByName "jobWorkDir"     , EdhString workDir)
+        , (AttrByName "jobWorkModu"    , EdhString workModu)
+        , (AttrByName "swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
+        , (AttrByName "swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
+        , (AttrByName "wscFd"          , EdhDecimal $ fromIntegral wscFd)
+        ]
+      exit
+
+    void $ installEdhModule world "swarm/RT" $ \pgs exit -> do
+
+      let moduScope = contextScope $ edh'context pgs
+          modu      = thisObject moduScope
+
+      moduArts <-
+        sequence
+        $  [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+           | (mc, nm, hp, args) <-
+             [ ( EdhMethod
+               , "wscTake"
+               , wscTakeProc
+               , PackReceiver
+                 [ RecvArg "wscFd"   Nothing Nothing
+                 , RecvArg "peerObj" Nothing Nothing
+                 ]
+               )
+             , ( EdhMethod
+               , "waitAnyWorkerDone"
+               , waitAnyWorkerDoneProc
+               , PackReceiver []
+               )
+             , ( EdhMethod
+               , "wscStartWorker"
+               , wscStartWorkerProc
+               , PackReceiver
+                 [ RecvArg "wsAddr"     Nothing Nothing
+                 , RecvArg "workDir"    Nothing Nothing
+                 , RecvArg "executable" Nothing Nothing
+                 , RecvArg "workModu"   Nothing Nothing
+                 ]
+               )
+             ]
            ]
-         ]
-      ++ [ (nm, ) <$> mkHostClass moduScope nm True hc
-         | (nm, hc) <- [("Deque", dequeHostCtor)]
-         ]
-    let moduArts =
-          moduArts1
-            ++ [ ("jobExecutable"  , EdhString executable)
-               , ("jobWorkDir"     , EdhString workDir)
-               , ("jobWorkModu"    , EdhString workModu)
-               , ("swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
-               , ("swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
-               , ("wscFd"          , EdhDecimal $ fromIntegral wscFd)
-               ]
+        ++ [ (nm, ) <$> mkHostClass moduScope nm True hc
+           | (nm, hc) <- [("Deque", dequeHostCtor)]
+           ]
 
-    artsDict <- createEdhDict
-      $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]
-    updateEntityAttrs pgs (objEntity modu)
-      $  [ (AttrByName k, v) | (k, v) <- moduArts ]
-      ++ [(AttrByName "__exports__", artsDict)]
+      artsDict <- createEdhDict
+        $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]
+      updateEntityAttrs pgs (objEntity modu)
+        $  [ (AttrByName k, v) | (k, v) <- moduArts ]
+        ++ [(AttrByName "__exports__", artsDict)]
 
-    exit
+      exit
 
 
 startSwarmWork :: IO ()

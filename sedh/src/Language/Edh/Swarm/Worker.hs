@@ -27,6 +27,41 @@ import           Language.Edh.EHI
 import           Language.Edh.Net
 
 
+waitAnyWorkerDoneProc :: EdhProcedure
+waitAnyWorkerDoneProc _ !exit = ask >>= \pgs ->
+  contEdhSTM $ edhPerformIO pgs waitAnyWorker $ \exitInfo ->
+    exitEdhProc exit exitInfo
+ where
+  waitAnyWorker :: IO EdhValue
+  waitAnyWorker = getAnyProcessStatus True False >>= \case
+    Nothing            -> return nil
+    Just (pid, status) -> case status of
+      Exited !exitCode ->
+        return
+          $ EdhPair
+              (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "exited"))
+          $ EdhString
+          $ T.pack
+          $ show exitCode
+      Terminated !sig !coreDumped ->
+        return
+          $  EdhPair
+               (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "killed"))
+          $  EdhString
+          $  T.pack
+          $  "by "
+          <> show sig
+          <> if coreDumped then " with" else " without" <> " core dumped"
+      Stopped !sig ->
+        return
+          $  EdhPair
+               (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "stopped"))
+          $  EdhString
+          $  T.pack
+          $  "by "
+          <> show sig
+
+
 wscStartWorkerProc :: EdhProcedure
 wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, EdhString !executable, EdhString !workModu] !kwargs) !exit
   | Map.null kwargs

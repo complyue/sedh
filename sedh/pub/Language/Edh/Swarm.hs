@@ -98,30 +98,36 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
       exit
 
 
-startSwarmWork :: IO ()
-startSwarmWork = do
+startSwarmWork :: (EdhWorld -> IO EdhWorld) -> IO ()
+startSwarmWork !worldCustomization = do
   starter@(SwarmWorkStarter _executable _workDir workModu managerPid workerPid wscFd) <-
     determineSwarmWorkStarter
 
   console <- defaultEdhConsole defaultEdhConsoleSettings
-  let consoleOut      = writeTBQueue (consoleIO console) . ConsoleOut
-      consoleShutdown = writeTBQueue (consoleIO console) ConsoleShutdown
+  let
+    consoleOut      = writeTBQueue (consoleIO console) . ConsoleOut
+    consoleShutdown = writeTBQueue (consoleIO console) ConsoleShutdown
 
-      workProg :: IO ()
-      workProg = do
+    workProg :: IO ()
+    workProg = do
 
-        -- create the world, we always work with this world no matter how
-        -- many times the Edh programs crash
-        world <- createEdhWorld console
-        installEdhBatteries world
+      -- create the world, we always work with this world no matter how
+      -- many times the Edh programs crash
+      world' <- createEdhWorld console
+      installEdhBatteries world'
 
-        -- install batteries provided by nedh
-        installNetBatteries world
+      -- install batteries provided by nedh
+      installNetBatteries world'
 
-        -- install batteries provided by sedh
-        installSwarmBatteries starter world
+      -- install batteries provided by sedh
+      installSwarmBatteries starter world'
 
-        if wscFd == 0
+      -- call custom preparation
+      world <- worldCustomization world'
+
+      if "" == workModu
+        then swarmRepl console world
+        else if wscFd == 0
           then runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
             Left !err -> atomically $ do
               -- program crash on error
@@ -156,7 +162,7 @@ startSwarmWork = do
                   EdhString msg -> msg
                   _             -> T.pack $ show phv
 
-        atomically consoleShutdown
+      atomically consoleShutdown
 
   void $ forkFinally workProg $ \result -> do
     case result of
@@ -166,22 +172,66 @@ startSwarmWork = do
     -- shutdown console IO anyway
     atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
 
-  atomically $ if wscFd == 0
-    then
-      consoleOut
-      $  ">> Hunting working heads for "
-      <> workModu
-      <> " from Edh swarm ["
-      <> T.pack (show managerPid)
-      <> "] <<\n"
-    else
-      consoleOut
-      $  ">> Working out "
-      <> workModu
-      <> " for Edh swarm by worker ["
-      <> T.pack (show workerPid)
-      <> "] of forager ["
-      <> T.pack (show managerPid)
-      <> "] <<\n"
+  atomically $ if "" == workModu
+    then consoleOut ">> Get Work Done - by a swarm <<\n"
+    else if wscFd == 0
+      then
+        consoleOut
+        $  ">> Hunting working heads for "
+        <> workModu
+        <> " from swarm, HH pid="
+        <> T.pack (show managerPid)
+        <> " <<\n"
+      else
+        consoleOut
+        $  ">> Working out "
+        <> workModu
+        <> " for swarm by worker pid="
+        <> T.pack (show workerPid)
+        <> " forager pid="
+        <> T.pack (show managerPid)
+        <> " <<\n"
 
   consoleIOLoop console
+
+
+-- | Manage lifecycle of Edh programs during the repl session
+swarmRepl :: EdhConsole -> EdhWorld -> IO ()
+swarmRepl !console !world = do
+  atomically $ do
+    consoleOut
+      "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
+    consoleOut "  https://github.com/e-wrks/sedh/tree/master/Tour\n"
+
+  -- here being the host interpreter, we loop infinite runs of the Edh
+  -- console REPL program, unless cleanly shutdown, for resilience
+  let doneRightOrRebirth = runEdhModule world "swarm" edhModuleAsIs >>= \case
+    -- to run a module is to seek its `__main__.edh` and execute the
+    -- code there in a volatile module context, it can import itself
+    -- (i.e. `__init__.edh`) during the run. all imported modules can
+    -- survive program crashes.
+        Left !err -> do -- program crash on error
+          atomically $ do
+            consoleOut "Your program crashed with an error:\n"
+            consoleOut $ T.pack $ show err <> "\n"
+            -- the world with all modules ever imported, is still
+            -- there, repeat another repl session with this world.
+            -- it may not be a good idea, but just so so ...
+            consoleOut "🐴🐴🐯🐯\n"
+          doneRightOrRebirth
+        Right !phv -> case edhUltimate phv of
+            -- clean program halt, all done
+          EdhNil -> atomically $ consoleOut "Well done, bye.\n"
+          _      -> do -- unclean program exit
+            atomically $ do
+              consoleOut "Your program halted with a result:\n"
+              consoleOut $ (<> "\n") $ case phv of
+                EdhString msg -> msg
+                _             -> T.pack $ show phv
+            -- the world with all modules ever imported, is still
+            -- there, repeat another repl session with this world.
+            -- it may not be a good idea, but just so so ...
+              consoleOut "🐴🐴🐯🐯\n"
+            doneRightOrRebirth
+  doneRightOrRebirth
+  where consoleOut = writeTBQueue (consoleIO console) . ConsoleOut

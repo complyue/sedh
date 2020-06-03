@@ -134,6 +134,7 @@ WorkToDo(
   {$ hcDemand $},
   {$ senv.jobExecutable $},
   {$ senv.jobWorkDir $},
+  {$ senv.jobWorkModu $},
   {$ priority $},
 )
 

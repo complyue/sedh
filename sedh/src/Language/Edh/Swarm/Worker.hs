@@ -63,40 +63,50 @@ waitAnyWorkerDoneProc _ !exit = ask >>= \pgs ->
 
 
 wscStartWorkerProc :: EdhProcedure
-wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, EdhString !executable, EdhString !workModu] !kwargs) !exit
+wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExecutable, EdhString !workModu] !kwargs) !exit
   | Map.null kwargs
-  = ask >>= \pgs ->
-    contEdhSTM
-      $   fromDynamic
-      <$> readTVar (entity'store $ objEntity wsAddrObj)
-      >>= \case
-            Just addr@AddrInfo{} -> do
-              wkrPidVar <- newTVar (0 :: Int)
-              flip
-                  (edhPerformIO pgs)
-                  (\() -> contEdhSTM $ readTVar wkrPidVar >>= \pid ->
-                    exitEdhSTM pgs exit $ EdhDecimal $ fromIntegral pid
-                  )
-                $ bracket
-                    (socket (addrFamily addr)
-                            (addrSocketType addr)
-                            (addrProtocol addr)
-                    )
-                    close
-                $ \sock -> do
-                    connect sock (addrAddress addr)
-                    bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
-                      -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                      setFdOption (Fd wscFd) CloseOnExec False
-                      wkrPid <- forkProcess $ do
-                        changeWorkingDirectory $ T.unpack workDir
-                        executeFile
-                          "/usr/bin/env"
-                          False
-                          [T.unpack executable, T.unpack workModu, show wscFd]
-                          Nothing
-                      atomically $ writeTVar wkrPidVar $ fromIntegral wkrPid
-            _ -> throwEdhSTM pgs EvalError "Invalid worksource addr object"
+  = ask >>= \pgs -> contEdhSTM $ prepCmdl pgs $ \wkrCmdl ->
+    fromDynamic <$> readTVar (entity'store $ objEntity wsAddrObj) >>= \case
+      Just addr@AddrInfo{} -> do
+        wkrPidVar <- newTVar (0 :: Int)
+        flip
+            (edhPerformIO pgs)
+            (\() -> contEdhSTM $ readTVar wkrPidVar >>= \pid ->
+              exitEdhSTM pgs exit $ EdhDecimal $ fromIntegral pid
+            )
+          $ bracket
+              (socket (addrFamily addr)
+                      (addrSocketType addr)
+                      (addrProtocol addr)
+              )
+              close
+          $ \sock -> do
+              connect sock (addrAddress addr)
+              bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+                -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                setFdOption (Fd wscFd) CloseOnExec False
+                wkrPid <- forkProcess $ do
+                  changeWorkingDirectory $ T.unpack workDir
+                  executeFile "/usr/bin/env"
+                              False
+                              (wkrCmdl ++ [T.unpack workModu, show wscFd])
+                              Nothing
+                atomically $ writeTVar wkrPidVar $ fromIntegral wkrPid
+      _ -> throwEdhSTM pgs EvalError "Invalid worksource addr object"
+ where
+  strSeq
+    :: EdhProgState -> [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
+  strSeq _   []       !sl exit' = exit' $ reverse sl
+  strSeq pgs (v : vs) !sl exit' = case edhUltimate v of
+    EdhString !s -> strSeq pgs vs (T.unpack s : sl) exit'
+    _ -> throwEdhSTM pgs UsageError $ "In exec cmdl, not a string: " <> T.pack
+      (show v)
+  prepCmdl :: EdhProgState -> ([String] -> STM ()) -> STM ()
+  prepCmdl !pgs !exit' = case jobExecutable of
+    EdhString !executable  -> exit' [T.unpack executable]
+    EdhTuple  !vs          -> strSeq pgs vs [] exit'
+    EdhList   (List _ !lv) -> readTVar lv >>= \vs -> strSeq pgs vs [] exit'
+    _                      -> throwEdhSTM pgs UsageError "Invalid jobExecutable"
 wscStartWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 

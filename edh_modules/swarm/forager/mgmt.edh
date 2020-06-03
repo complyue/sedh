@@ -16,12 +16,13 @@ import * './wsq'
 export class WSC {
 
   method __init__ (
-    forager as this.forager,
-    addr as this.addr, 
-    hcPlanned as this.hcPlanned,
-    executable as this.executable,
-    workDir as this.workDir,
-    priority as this.priority,
+    forager     as this.forager,
+    addr        as this.addr, 
+    hcPlanned   as this.hcPlanned,
+    executable  as this.executable,
+    workDir     as this.workDir,
+    workModu    as this.workModu,
+    priority    as this.priority,
   ) pass
 
   # headcount reserved for this worksource
@@ -115,7 +116,7 @@ export class WSC {
       while this.workers.size < hcEmployed {
         case wscStartWorker(
           this.addr,
-          senv.jobWorkDir, senv.jobExecutable, senv.jobWorkModu,
+          this.workDir, this.executable, this.workModu,
         ) of { wkrPid } -> {
           this.workers[wkrPid] = this
           this.forager.workerStarted <- pkargs(wkrPid, this)
@@ -147,12 +148,13 @@ export class WSC {
   }
 
   method update (
-    hcPlanned, executable, workDir, priority,
+    hcPlanned, executable, workDir, workModu, priority,
   ) {
     # TODO check and deal with expected / unexpected changes
     this.hcPlanned = hcPlanned
     this.executable = executable
     this.workDir = workDir
+    this.workModu = workModu
     this.priority = priority
   }
 
@@ -180,10 +182,10 @@ export class Forager {
     hcPlanned,     # planned headcount to recruit
     executable,    # executable file path to launch as worker processes
     workDir,       # working directory
+    workModu,      # work definition module
     priority = 0,  # used to prioritize allocation of work heads
-    target = '',   # for prefix based filtering of uninteresting work
   ) {
-    case target of {
+    case workModu of {
       { that.targetPrefix >@ _ } -> { pass }
       return nil  # filtered out by prefix
     }
@@ -200,11 +202,11 @@ export class Forager {
         case this.wsq.iqd[wsKey] of {
           { wsc } -> {
             # already in queue, refresh its known states up-to-date
-            wsc.update( hcPlanned, executable, workDir, priority, )
+            wsc.update( hcPlanned, executable, workDir, workModu, priority, )
           }
           this.wsq.enque(WSC(
             forager=this, addr=that.addr,
-            hcPlanned, executable, workDir, priority,
+            hcPlanned, executable, workDir, workModu, priority,
           ))
         }
       }

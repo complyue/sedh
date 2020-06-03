@@ -14,7 +14,8 @@ case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
 
 
 # take the worksource connection file describer, make it a peer for comm
-peer = wscTake(senv.wscFd, Peer())
+# note `wscTake()` performs IO, so assign its return value won't work
+case wscTake(senv.wscFd, Peer()) of { peer } -> { pass }
 
 
 # inherit the work module, so we have access to `@doOneJob` implemented there
@@ -33,17 +34,24 @@ StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
   )
 }
 
-for ips from initiateJobs( outlet=peer.armChannel(dataChan) )
 # apks are expected to be posted to a worker's data channel, one by one
-do case this.@doOneJob(***ips) of {
-  { result } -> {
-    peer.p2c(dataChan, repr(result))
+for ips from initiateJobs( outlet=peer.armChannel(dataChan) ) do {
+
+;-1<|'xx'
+
+  console.debug<| 'Computing ips: ' ++ ips
+
+  case this.@doOneJob(***ips) of {
+    { result } -> {
+      peer.p2c(dataChan, repr(result))
+    }
+    throw UsageError('Swarm job returned no result', ips=ips)
+  } $=> { jobExc } -> {
+    console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - ' 
+      ++ senv.swarmManagerPid ++ '>' ++ senv.swarmWorkerPid ++ '] failure:\n'
+      ++ jobExc
+    peer.p2c(errChan, repr(jobExc))
+    break  # stop processing more jobs
   }
-  throw UsageError('Swarm job returned no result', ips=ips)
-} $=> { jobExc } -> {
-  console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - [' 
-    ++ senv.swarmManagerPid ++ '/' ++ senv.swarmWorkerPid, '] failure:\n'
-    ++ jobExc
-  peer.p2c(errChan, repr(jobExc))
-  break
+
 }

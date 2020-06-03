@@ -7,6 +7,16 @@
 # it's a good idea to archive this file as part of the result
 # data done by the swarm, even version control them
 
+
+# work definition scripts are allowed to change the inferred
+# configuration at 'swarm/ENV', import it as a namespace to
+# change it as appropriate
+case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
+
+# uncomment so modified code get re-compiled during job running
+# senv.jobExecutable = ('cabal', 'run', 'gwd')
+
+
 # import reusable work definition from some module, don't
 # put too much logic in this entry module, an entry module
 # should just like a comprehensive command line, don't 

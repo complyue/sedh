@@ -45,6 +45,16 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
                , RecvArg "peerObj" Nothing Nothing
                ]
              )
+           , ( EdhMethod
+             , "wscStartWorker"
+             , wscStartWorkerProc
+             , PackReceiver
+               [ RecvArg "wsAddr"     Nothing Nothing
+               , RecvArg "workDir"    Nothing Nothing
+               , RecvArg "executable" Nothing Nothing
+               , RecvArg "workModu"   Nothing Nothing
+               ]
+             )
            ]
          ]
       ++ [ (nm, ) <$> mkHostClass moduScope nm True hc

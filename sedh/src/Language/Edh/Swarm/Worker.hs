@@ -4,6 +4,8 @@ module Language.Edh.Swarm.Worker where
 import           Prelude
 -- import           Debug.Trace
 
+import           System.Posix
+
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Reader
@@ -23,6 +25,44 @@ import           Network.Socket.ByteString      ( recv
 import qualified Data.Lossless.Decimal         as D
 import           Language.Edh.EHI
 import           Language.Edh.Net
+
+
+wscStartWorkerProc :: EdhProcedure
+wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, EdhString !executable, EdhString !workModu] !kwargs) !exit
+  | Map.null kwargs
+  = ask >>= \pgs ->
+    contEdhSTM
+      $   fromDynamic
+      <$> readTVar (entity'store $ objEntity wsAddrObj)
+      >>= \case
+            Just addr@AddrInfo{} -> do
+              wkrPidVar <- newTVar (0 :: Int)
+              flip
+                  (edhPerformIO pgs)
+                  (\() -> contEdhSTM $ readTVar wkrPidVar >>= \pid ->
+                    exitEdhSTM pgs exit $ EdhDecimal $ fromIntegral pid
+                  )
+                $ bracket
+                    (socket (addrFamily addr)
+                            (addrSocketType addr)
+                            (addrProtocol addr)
+                    )
+                    close
+                $ \sock -> do
+                    connect sock (addrAddress addr)
+                    bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+                      -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                      setFdOption (Fd wscFd) CloseOnExec False
+                      wkrPid <- forkProcess $ do
+                        changeWorkingDirectory $ T.unpack workDir
+                        executeFile
+                          "/usr/bin/env"
+                          False
+                          [T.unpack executable, T.unpack workModu, show wscFd]
+                          Nothing
+                      atomically $ writeTVar wkrPidVar $ fromIntegral wkrPid
+            _ -> throwEdhSTM pgs EvalError "Invalid worksource addr object"
+wscStartWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 
 wscTakeProc :: EdhProcedure

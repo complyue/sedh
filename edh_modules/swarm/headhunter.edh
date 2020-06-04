@@ -87,11 +87,9 @@ export class HeadHunter {
   ) {
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
       ++ foragerPid ++ ' via ' ++ that.peer.ident() ++ ' start working.'
-    ai {
-      worker = Worker(that.peer, workerPid, foragerPid)
-      worker => this.idleWorkers
-      this.workerAvailable <- worker
-    }
+    worker = Worker(that.peer, workerPid, foragerPid)
+    this.idleWorkers.push(worker)
+    this.workerAvailable <- worker
     return nil
   }
 
@@ -201,9 +199,9 @@ WorkToDo(
       # call the effectful failure callback
       case perform @shouldRetryJob of {
         false -> { pass }
-        true -> ips => this.pendingJobs
+        true -> this.pendingJobs.push(ips)
         { retryChk } -> case retryChk( jobExc, ips ) of { newIPS } -> {
-          newIPS => this.pendingJobs
+          this.pendingJobs.push(newIPS)
         }
       }
 
@@ -222,7 +220,7 @@ WorkToDo(
     for (***result) from submitJob(outlet=jobSink) do {
       this.resultSink <- pkargs(ips, result)
       this.pendingCntr <- mre(this.pendingCntr) - 1
-      worker => this.idleWorkers
+      this.idleWorkers.push(worker)
       this.workerAvailable <- worker
       break  # one ips at a time
     }
@@ -230,21 +228,13 @@ WorkToDo(
 
   method submitJobs() {
     while true {
-      ai case this.pendingJobs of {
-        { ips => pendingJobs } -> {
-          this.pendingCntr <- 1 + (mre(this.pendingCntr) |> 0)
-          this.pendingJobs = pendingJobs
-        }
-        return nil  # no more pending jobs
-      }
+      ips = this.pendingJobs.pop()
+      ips == None -> { return nil }  # no more pending jobs
+      this.pendingCntr <- 1 + (mre(this.pendingCntr) |> 0)
 
       while true {
         # try grab a present idle worker and assign it this job
-        ai case this.idleWorkers of {
-          { worker => idleWorkers} ->
-            this.idleWorkers = idleWorkers
-          worker = None
-        }
+        worker = this.idleWorkers.pop()
         worker != None -> {
           console.debug<| 'Job assigned to ' ++ worker ++ ' - ' ++ ips
           # start asynchronous concurrency
@@ -264,7 +254,7 @@ WorkToDo(
   }
 
   method dispatchJob(ips) {
-    ips => this.pendingJobs
+    this.pendingJobs.push(ips)
     this.submitJobs()
   }
 

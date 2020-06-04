@@ -67,12 +67,25 @@ export method @doOneJob * {
 }
 
 
+{#
+ # this is supposed to be the reused entry function, instantiation
+ # paremeter sets are generated synchronously by a generator
+ # procedure, then results are just printed as they come back.
+ #
+ # see: manageBatchJobs() from 'swarm/work/batch' for how the job
+ # scheduling is done
+ #
+ # see: what effectful configs/callbacks are performed from
+ # 'swarm/headhunter' for swarm/work tuning options
+ # 
+ #}
 export method manageThisWork * {
 
   # log and retry on job failure
   effect method @shouldRetryJob (jobExc, ips) {
     console.error<| 'Job failed: ' ++ jobExc
-    return ips  # retry the same ips, while a different one can be returned
+    return ips  # retry the same ips 
+    # a different ips can be returned from here to retry
   }
 
   generator iterParams() {

@@ -1,7 +1,6 @@
 
 # this is the entry module of an Edh Swarm Forager
 
-
 import * 'swarm/forager'
 
 case forageOn(

@@ -16,12 +16,13 @@ addr := Addr()
 
 
 # configured prefix to filter out uninteresting worksources
-# normally implanted by host module preparation
+# this is normally implanted by host module initialization
 targetPrefix ?:= ''
 
 # the managing forager instance
-# normally implanted by host module preparation
+# this is normally implanted by host module initialization
 forager ?:= Forager()
+
 
 # expose its reacting (exported) methods here, to be callable
 # by sniffed commands

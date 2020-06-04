@@ -34,7 +34,7 @@ case { import (**_) 'swarm/ENV' } of { senv } -> {
   # control work priority and maximum number of worker processes we hire from
   # the swarm
   effect priority = 0
-  effect headcount = 1
+  effect headcount = 3
 
   # the interval to check and announce call-for-workers
   effect cfwInterval = 3

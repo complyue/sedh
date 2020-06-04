@@ -2,6 +2,8 @@
 import * 'net'
 
 import * 'swarm/RT'
+import * 'swarm/symbols'
+
 
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
@@ -24,7 +26,25 @@ export class HeadHunter {
   }
 
   class Worker {
-    method __init__(peer as this.peer) pass
+    method __init__(
+      peer as this.peer,
+      workerPid as this.pid,
+      foragerPid as this.manager,
+    ) {
+      errSink = this.peer.armChannel(errChan)
+      # convert disconnection without result to error
+      go {
+        discExc = None
+        this.peer.join() $=> {
+          { discExc } -> { pass }
+        }
+        errSink <- discExc |> PeerError('Swarm worker disconnected')
+      }
+    }
+
+    method __repr__() {
+      '<Worker pid=' ++ this.pid ++ ' via ' ++ this.peer.ident() ++ '>'
+    }
   }
 
   hcEmployed = 0  # total heads employed by this HH
@@ -68,7 +88,7 @@ export class HeadHunter {
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
       ++ foragerPid ++ ' via ' ++ that.peer.ident() ++ ' start working.'
     ai {
-      worker = Worker(that.peer)
+      worker = Worker(that.peer, workerPid, foragerPid)
       worker => this.idleWorkers
       this.workerAvailable <- worker
     }
@@ -106,18 +126,40 @@ export class HeadHunter {
 
   # data structures for job scheduling
   foragers = {}
-  workerAvailable = sink
-  idleWorkers = []
-  pendingJobs = []
-  allDone = sink
+  workerAvailable = sink  # signal on new worker available,
+  # but should obtain an available worker from idleWorkers with tx
+  idleWorkers = []   # FILO queue
+  pendingJobs = []   # FILO queue
+  pendingCntr = sink  # increased/decreased on job submit/result/err
+  finishingUp = sink  # signal of no more jobs, i.e. to start finishing up
+  finished = sink  # the final singal that all have finished
+
+  method allFinished() {
+    finished =  # note this has an implicit tx which is desirable here
+      mre(this.finishingUp) == true
+      && mre(this.pendingCntr) == 0
+      && null(this.pendingJobs)
+    ;| finished -> this.finished <- true
+    return false
+  }
 
   method __init__( resultSink as this.resultSink ) go {
-    perceive this.allDone { break }
+    # stop immediately on the last signal that all have finished
+    perceive this.finishingUp {
+      this.allFinished() -> { break }
+    }
+    perceive this.pendingCntr 0 -> {
+      this.allFinished() -> { break }
+    }
+
     # advertise call-for-workers when there's demand
     for _ from console.everySeconds(
       perform cfwInterval $=> 3,  # use effectful config
       wait1st=false,  # announce the first CFW immediately
     ) do {
+      # check if all have finished
+      this.allFinished() -> { break }
+
       # calibrate this.hcEmployed, wrt forager disconnection etc.
       hcEmployed = 0
       for (peer, forager) from this.foragers do {
@@ -126,9 +168,10 @@ export class HeadHunter {
         }
         hcEmployed += forager.hcEmployed
       }
-      this.hcEmployed = hcEmployed
-
-      console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed atm.'
+      if this.hcEmployed != hcEmployed then {
+        console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
+        this.hcEmployed = hcEmployed
+      }
 
       if (hcDemand = this.headcount - hcEmployed) > 0 then {
         console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
@@ -151,25 +194,11 @@ WorkToDo(
   method trackJob(worker, ips) {
     # arm new private data/err channels to this job
     jobSink = worker.peer.armChannel(dataChan)
-    errSink = worker.peer.armChannel(errChan)
-    # convert disconnection without result to error
-    go {
-      worker.peer.join() $=> {
-        { discExc } -> { pass }
-        discExc = None
-      }
-      case mre(jobSink) of nil ->
-      errSink <- discExc |>
-        PeerError('Swarm worker disconnected unexpectedly')
-    }
     # perform retry effect on error
-    perceive errSink { jobExc } -> {
-      # mark local data chan eos, for there's an stm dead lock to avoid,
-      # due to the for loop
-      jobSink <- nil
+    perceive worker.peer.armedChannel(errChan) { jobExc } -> {
+      worker.peer.stop() # disconnect this worker anyway on error
 
-      worker.peer.stop() # disconnect on error
-
+      # call the effectful failure callback
       case perform @shouldRetryJob of {
         false -> { pass }
         true -> ips => this.pendingJobs
@@ -177,15 +206,24 @@ WorkToDo(
           newIPS => this.pendingJobs
         }
       }
+
+      # failed to get a result, but we know it's not pending now
+      if nil == mre(jobSink) then {
+        this.pendingCntr <- mre(this.pendingCntr) - 1
+        jobSink <- nil
+      }
+
       break  # terminate this thread
     }
     # submit ips and process result
     producer submitJob(outlet) {
       worker.peer.p2c(dataChan, repr(ips))
     }
-    for result from submitJob(outlet=jobSink) do {
-      this.resultSink <- (ips, result)
-      this.workerAvailable <- worker => this.idleWorkers
+    for (***result) from submitJob(outlet=jobSink) do {
+      this.resultSink <- pkargs(ips, result)
+      this.pendingCntr <- mre(this.pendingCntr) - 1
+      worker => this.idleWorkers
+      this.workerAvailable <- worker
       break  # one ips at a time
     }
   }
@@ -193,25 +231,34 @@ WorkToDo(
   method submitJobs() {
     while true {
       ai case this.pendingJobs of {
-        { ips => pendingJobs } ->
+        { ips => pendingJobs } -> {
+          this.pendingCntr <- 1 + (mre(this.pendingCntr) |> 0)
           this.pendingJobs = pendingJobs
+        }
         return nil  # no more pending jobs
       }
 
       while true {
+        # try grab a present idle worker and assign it this job
         ai case this.idleWorkers of {
           { worker => idleWorkers} ->
             this.idleWorkers = idleWorkers
           worker = None
         }
         worker != None -> {
+          console.debug<| 'Job assigned to ' ++ worker ++ ' - ' ++ ips
           # start asynchronous concurrency
           go trackJob(worker, ips)
+          break  # this job settled, proceed to next job
         }
 
+        # no immediate idle worker, need to wait
+        console.debug<| 'Wait for idle workers.'
         # wait until new idle workers appear
-        for _ from this.workerAvailable do not null(this.idleWorkers)
-        -> { break }
+        for _ from this.workerAvailable do {
+          not null(this.idleWorkers) -> { break }
+        }
+        console.debug<| 'Got idle workers.'
       }
     }
   }
@@ -219,6 +266,12 @@ WorkToDo(
   method dispatchJob(ips) {
     ips => this.pendingJobs
     this.submitJobs()
+  }
+
+  method finishUp() {
+    this.finishingUp <- true
+    not this.allFinished() ->
+      for _ from this.finished do { break }
   }
 
 }

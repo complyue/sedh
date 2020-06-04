@@ -49,14 +49,21 @@ export method @doOneJob * {
   # define their own symbols used to identify the expected effects,
   # instead of the alphanumeric name `c` as demonstrated here.
   effect c = m + n
-  r = computeIt(m * n)
+  case computeIt(m * n) of { r } -> { pass }
 
   # simulate computation time cost, each taking 3 seconds.
   for ts from console.everySeconds(3) do { break }
+  # or no artificial delay
+  # ts = console.now()
 
-  return pkargs(
+  # prepare the result to be returned
+  result = pkargs(
     r=r, ts=ts,
   )
+
+  console.debug<| 'Returning result ' ++ result
+  # return result of the job
+  return result
 }
 
 
@@ -65,14 +72,15 @@ export method manageThisWork * {
   # log and retry on job failure
   effect method @shouldRetryJob (jobExc, ips) {
     console.error<| 'Job failed: ' ++ jobExc
-    return ips  # retry the same job
+    return ips  # retry the same ips, while a different one can be returned
   }
 
   generator iterParams() {
     for m from m_range() do 
     for n from n_range() do
-    not exclude(m, n) ->
-    yield pkargs( m=m, n=n, )
+    not exclude(m, n) -> {
+      yield pkargs( m=m, n=n, )
+    }
   }
 
   for (ips, result) from manageBatchJobs( iterParams ) do {

@@ -12,10 +12,13 @@ export producer manageBatchJobs(
   outlet,
 ) case HeadHunter(outlet) of { hh } -> {
   for (***ips) from params() do {
+    console.debug<| 'Dispatching job ips=' ++ ips
     # blocking wait the job dispatched
     hh.dispatchJob(ips)
   }
+  console.info<| 'All jobs sent out.'
+  hh.finishUp()
 } @=> {  # tell the headhunter to stop anyway
-  hh.allDone <- true
+  outlet <- nil
 }
 

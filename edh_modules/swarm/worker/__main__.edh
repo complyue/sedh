@@ -45,12 +45,12 @@ StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
 }
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for ips from initiateJobs( outlet=jobSink ) do {
-
+go for (***ips) from initiateJobs( outlet=jobSink ) do {
   console.debug<| 'Computing ips: ' ++ ips
 
-  case this.@doOneJob(***ips) of {
+  case super.@doOneJob(***ips) of {
     { result } -> {
+      console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
       peer.p2c(dataChan, repr(result))
     }
     throw UsageError('Swarm job returned no result', ips=ips)

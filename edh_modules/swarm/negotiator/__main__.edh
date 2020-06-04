@@ -56,8 +56,8 @@ go wsc.teamKeeper()
 
 } @=> {
   { exc } -> {
-    console.error<| 'Disconnecting worksource ' ++ peer
+    console.error<| 'Disconnected with worksource ' ++ peer
       ++ ' for error: ' ++ exc
   }
-  console.debug<| 'Disconnecting worksource ' ++ peer
+  console.debug<| 'Disconnected with worksource ' ++ peer
 }

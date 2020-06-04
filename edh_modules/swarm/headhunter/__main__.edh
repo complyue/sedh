@@ -7,12 +7,9 @@ import (Peer, **_) 'net/RT'
 import * 'net/symbols'
 effect import * 'net/effects'
 
-# expose service procedures exported from the persistent module
-import * '.'
-
 
 peer ?:= Peer()
-console.info<| 'Swarm forager/worker connected - ' ++ peer
+console.debug<| 'Swarm forager/worker connected - ' ++ peer
 
 
 effect {
@@ -33,8 +30,8 @@ effect {
 
 } @=> {
   { exc } -> {
-    console.error<| 'Disconnecting swarm forager/worker ' ++ peer
+    console.warn<| 'Disconnected with swarm forager/worker ' ++ peer
       ++ ' for error: ' ++ exc
   }
-  console.info<| 'Disconnecting swarm forager/worker ' ++ peer
+  console.debug<| 'Disconnected with swarm forager/worker ' ++ peer
 }

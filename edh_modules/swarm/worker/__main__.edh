@@ -15,20 +15,21 @@ case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
 
 # take the worksource connection file describer, make it a peer for comm
 # note `wscTake()` performs IO, so assign its return value won't work
-case wscTake(senv.wscFd, Peer()) of { peer } -> { pass }
+case wscTake(senv.wscFd, Peer()) of { peer } -> {
+  console.debug<| 'Took worker connection to worksource: ' ++ peer
+}
+
+jobSink = peer.armChannel(dataChan)
+
+effect {
+  ;@netPeer = peer
+  ;@dataSink = jobSink
+}
 
 
 # inherit the work module, so we have access to `@doOneJob` implemented there
 extends {
   import (**_) senv.jobWorkModu
-}
-
-
-dataSink = peer.armChannel(dataChan)
-
-effect {
-  ;@netPeer = peer
-  ;@dataSink = dataSink
 }
 
 
@@ -40,10 +41,11 @@ producer initiateJobs(outlet) {
 StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
 
   )
+  console.debug<| 'Started working for worksource ' ++ peer
 }
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for ips from initiateJobs( outlet=dataSink ) do {
+go for ips from initiateJobs( outlet=jobSink ) do {
 
   console.debug<| 'Computing ips: ' ++ ips
 

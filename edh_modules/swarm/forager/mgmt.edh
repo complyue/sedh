@@ -36,7 +36,8 @@ export class WSC {
 
   method __repr__() {
     '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
-      ++ mre(this.hcEmployed) ++ '/' ++ this.hcReserved ++ '>'
+      ++ mre(this.hcEmployed) ++ '/' ++ this.hcReserved
+      ++ '/' ++ this.hcPlanned ++ '>'
   }
 
   method key() repr(this.addr)
@@ -254,7 +255,7 @@ export class Forager {
 
     # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
-      console.debug<| 'Discovered new worksource: ' ++ wsc
+      console.debug<| 'Discovered new worksource: ' ++ wsc.addr
 
       # do wait if can not immediately fulfill all the heads
       if hcCum < this.headcount && hcCum < wsc.hcPlanned
@@ -266,7 +267,8 @@ export class Forager {
         || (hcCum > 0 && console.now() - nsLastIdle > 5e9)
         -> { break }
 
-      console.debug<| 'Engaging worksource with ' ++ hcCum ++ ' heads to offer.'
+      console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
+        ++ hcCum ++ ' heads to offer.'
 
       # engage with this worksource with as many free heads atm
       # `engage()` should return quickly without waiting for network,

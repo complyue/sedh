@@ -24,9 +24,7 @@ export class HeadHunter {
   }
 
   class Worker {
-    method __init__(peer as this.peer) {
-      this.datas = perform @dataSink
-    }
+    method __init__(peer as this.peer) pass
   }
 
   hcEmployed = 0  # total heads employed by this HH
@@ -68,8 +66,13 @@ export class HeadHunter {
     workerPid, foragerPid,
   ) {
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
-      ++ foragerPid ++ ' @ ' ++ that.peer.ident() ++ ' start working.'
-    this.workerAvailable <- Worker(that.peer) => this.idleWorkers
+      ++ foragerPid ++ ' via ' ++ that.peer.ident() ++ ' start working.'
+    ai {
+      worker = Worker(that.peer)
+      worker => this.idleWorkers
+      this.workerAvailable <- worker
+    }
+    return nil
   }
 
   method __swarm_conn_init__() {
@@ -78,9 +81,9 @@ export class HeadHunter {
   }
 
   case Server (
-    'swarm/headhunter',  # the service module
-    '0.0.0.0',           # local addr to bind
-    0,                   # local port to bind
+    'swarm/headhunter',               # the service module
+    perform swarmIface $=> '0.0.0.0', # local addr to bind
+    0,                                # local port to bind
     # per-connection peer module initialization
     init=__swarm_conn_init__,
   ) of { server } -> {
@@ -96,7 +99,7 @@ export class HeadHunter {
   # call-for-workers advertiser
   case Advertiser(
     # target swarm address
-    perform swarmAddr, perform swarmPort,
+    perform swarmAddr $=> '127.0.0.1', perform swarmPort $=> 3722,
     # announce call-for-workers from our worksource addr
     fromAddr=wsAddr,
   ) of { cfw } -> { pass }
@@ -111,8 +114,10 @@ export class HeadHunter {
   method __init__( resultSink as this.resultSink ) go {
     perceive this.allDone { break }
     # advertise call-for-workers when there's demand
-    # TODO make the check interval tunable
-    for _ from console.everySeconds(3, wait1st=false) do {
+    for _ from console.everySeconds(
+      perform cfwInterval $=> 3,  # use effectful config
+      wait1st=false,  # announce the first CFW immediately
+    ) do {
       # calibrate this.hcEmployed, wrt forager disconnection etc.
       hcEmployed = 0
       for (peer, forager) from this.foragers do {
@@ -145,7 +150,7 @@ WorkToDo(
 
   method trackJob(worker, ips) {
     # arm new private data/err channels to this job
-    dataSink = worker.peer.armChannel(dataChan)
+    jobSink = worker.peer.armChannel(dataChan)
     errSink = worker.peer.armChannel(errChan)
     # convert disconnection without result to error
     go {
@@ -153,7 +158,7 @@ WorkToDo(
         { discExc } -> { pass }
         discExc = None
       }
-      case mre(dataSink) of nil ->
+      case mre(jobSink) of nil ->
       errSink <- discExc |>
         PeerError('Swarm worker disconnected unexpectedly')
     }
@@ -161,7 +166,7 @@ WorkToDo(
     perceive errSink { jobExc } -> {
       # mark local data chan eos, for there's an stm dead lock to avoid,
       # due to the for loop
-      dataSink <- nil
+      jobSink <- nil
 
       worker.peer.stop() # disconnect on error
 
@@ -178,7 +183,7 @@ WorkToDo(
     producer submitJob(outlet) {
       worker.peer.p2c(dataChan, repr(ips))
     }
-    for result from submitJob(outlet=dataSink) do {
+    for result from submitJob(outlet=jobSink) do {
       this.resultSink <- (ips, result)
       this.workerAvailable <- worker => this.idleWorkers
       break  # one ips at a time

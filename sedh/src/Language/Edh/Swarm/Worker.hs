@@ -66,33 +66,41 @@ wscStartWorkerProc :: EdhProcedure
 wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExecutable, EdhString !workModu] !kwargs) !exit
   | Map.null kwargs
   = ask >>= \pgs -> contEdhSTM $ prepCmdl pgs $ \wkrCmdl ->
-    fromDynamic <$> readTVar (entity'store $ objEntity wsAddrObj) >>= \case
-      Just addr@AddrInfo{} -> do
-        wkrPidVar <- newTVar (0 :: Int)
-        flip
-            (edhPerformIO pgs)
-            (\() -> contEdhSTM $ readTVar wkrPidVar >>= \pid ->
-              exitEdhSTM pgs exit $ EdhDecimal $ fromIntegral pid
-            )
-          $ bracket
-              (socket (addrFamily addr)
-                      (addrSocketType addr)
-                      (addrProtocol addr)
-              )
-              close
-          $ \sock -> do
-              connect sock (addrAddress addr)
-              bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
-                -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                setFdOption (Fd wscFd) CloseOnExec False
-                wkrPid <- forkProcess $ do
-                  changeWorkingDirectory $ T.unpack workDir
-                  executeFile "/usr/bin/env"
-                              False
-                              (wkrCmdl ++ [T.unpack workModu, show wscFd])
-                              Nothing
-                atomically $ writeTVar wkrPidVar $ fromIntegral wkrPid
-      _ -> throwEdhSTM pgs EvalError "Invalid worksource addr object"
+    serviceAddressFrom pgs wsAddrObj $ \(servAddr, servPort) -> do
+      wkrPidVar <- newTVar (0 :: Int)
+      flip
+          (edhPerformIO pgs)
+          (\() -> contEdhSTM $ readTVar wkrPidVar >>= \pid ->
+            exitEdhSTM pgs exit $ EdhDecimal $ fromIntegral pid
+          )
+        $ do
+            addr <- do
+              let
+                hints = defaultHints { addrFlags      = [AI_PASSIVE]
+                                     , addrSocketType = Stream
+                                     }
+              addr : _ <- getAddrInfo (Just hints)
+                                      (Just $ T.unpack servAddr)
+                                      (Just (show servPort))
+              return addr
+            bracket
+                (socket (addrFamily addr)
+                        (addrSocketType addr)
+                        (addrProtocol addr)
+                )
+                close
+              $ \sock -> do
+                  connect sock (addrAddress addr)
+                  bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+                    -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                    setFdOption (Fd wscFd) CloseOnExec False
+                    wkrPid <- forkProcess $ do
+                      changeWorkingDirectory $ T.unpack workDir
+                      executeFile "/usr/bin/env"
+                                  False
+                                  (wkrCmdl ++ [T.unpack workModu, show wscFd])
+                                  Nothing
+                    atomically $ writeTVar wkrPidVar $ fromIntegral wkrPid
  where
   strSeq
     :: EdhProgState -> [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()

@@ -1,54 +1,66 @@
 
-# this is an entry moduel to hook up some worker nodes
-# from the swarm, to accomplish the work defined in some
-# module, with arbitrary overrides possible from this
-# module
+# this is an entry moduel to hook up some worker nodes from the swarm,
+# to accomplish the work defined in some module, with arbitrary overrides
+# possible from this module
 
-# it's a good idea to archive this file as part of the result
-# data done by the swarm, even version control them
+# it's a good idea to archive this file as part of the result data done by
+# the swarm, even version control them
 
-
-# work definition scripts are allowed to change the inferred
-# configuration at 'swarm/ENV', import it as a namespace to
-# change it as appropriate
-case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
-
-# uncomment so modified code get re-compiled during job running
-# senv.jobExecutable = ('cabal', 'run', 'gwd')
-
-
-# import reusable work definition from some module, don't
-# put too much logic in this entry module, an entry module
-# should just like a comprehensive command line, don't 
-# program the command line, or you are going to repeat
-# yourself in duplicating works in such entry modules
+# import reusable work definition from some module
+#
+# don't put too much logic in this entry module, an entry module should just
+# like a comprehensive command line, don't  program the command line, or you
+# are going to repeat yourself in duplicating works in such entry modules
 import * 'swarm/demo/batch'
 
-# if greater than 0, don't call for workers from the swarm,
-# start worker processes on this node to do the work, with
-# maximum number of local processes limited by it
-effect localHeads = 0
 
-# target swarm address
-effect swarmAddr = '255.255.255.255'
-effect swarmPort = 3722
-
-# control work priority and maximum number of worker processes
-# we hire from the swarm
-effect priority = 0
-effect headcount = 1
-
-
-# exported to override what's in the definition module scope,
-# serving as lexical default values to `manageThisWork()`
-#
-# see: `**__exports__` passed to `manageThisWork()` below
-export generator m_range() {
-  for m from range(7, 9) do yield m
+# work definition scripts are allowed to change the inferred configuration in
+# 'swarm/ENV', import it as a namespace here, to change it as appropriate
+case { import (**_) 'swarm/ENV' } of { senv } -> {
+  # uncomment so modified code get re-compiled during job running
+  # senv.jobExecutable = ('cabal', 'run', 'gwd')
 }
 
-# we can arbitrarily override artifacts for `manageThisWork()`
-# with whatever exported from this module, i.e. `__exports__`,
-# those will shadow what's in its lexical module global scope,
-# including those imported from './etc' and elsewhere
+
+{ # hyper parameters
+
+  # network interface viable in contacting the swarm
+  effect swarmIface = '0.0.0.0'
+  # target swarm address
+  effect swarmAddr = '127.0.0.1'  # local heads only
+  # effect swarmAddr = '255.255.255.255'  # all directly connected subnets
+  effect swarmPort = 3722
+
+  # control work priority and maximum number of worker processes we hire from
+  # the swarm
+  effect priority = 0
+  effect headcount = 1
+
+  # the interval to check and announce call-for-workers
+  effect cfwInterval = 3
+
+}
+
+
+{ # ad-hoc parameter overrides
+
+  # what's exported from this module will override artifacts those samely
+  # named in the reused work definition module's scope, they serve as lexical
+  # default values to `manageThisWork()` defined there
+  #
+  # see: `**__exports__` passed to `manageThisWork()` below
+
+  export generator m_range() {
+    for m from range(7, 9) do yield m
+  }
+
+}
+
+
+# transfer control to the imported work definition
+#
+# we can arbitrarily override artifacts for `manageThisWork()` with whatever
+# exported from this module, i.e. `__exports__`, those will shadow what's in
+# its lexical module global scope, including those imported from './etc'
+# and elsewhere
 manageThisWork (**__exports__)

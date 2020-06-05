@@ -14,7 +14,7 @@ console.debug<| 'Swarm forager/worker connected - ' ++ peer
 
 effect {
   ;@netPeer = peer
-  ;@dataSink = peer.armChannel(dataChan)
+  ;@dataSink = peer.armChannel(dataChan ?:= 'data')
 }
 
 

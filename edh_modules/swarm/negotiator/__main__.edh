@@ -27,7 +27,7 @@ console.debug<| 'Swarm forager negotiating with worksource - ' ++ peer
 
 effect {
   ;@netPeer = peer
-  ;@dataSink = peer.armChannel(dataChan)
+  ;@dataSink = peer.armChannel(dataChan ?:= 'data')
 }
 
 

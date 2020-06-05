@@ -6,4 +6,4 @@ import           Prelude
 import           Language.Edh.Swarm
 
 main :: IO ()
-main = startSwarmWork return
+main = startSwarmWork $ const $ return ()

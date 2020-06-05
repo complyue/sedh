@@ -98,7 +98,7 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
       exit
 
 
-startSwarmWork :: (EdhWorld -> IO EdhWorld) -> IO ()
+startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization = do
   starter@(SwarmWorkStarter _executable _workDir workModu managerPid workerPid wscFd) <-
     determineSwarmWorkStarter
@@ -113,17 +113,17 @@ startSwarmWork !worldCustomization = do
 
       -- create the world, we always work with this world no matter how
       -- many times the Edh programs crash
-      world' <- createEdhWorld console
-      installEdhBatteries world'
+      world <- createEdhWorld console
+      installEdhBatteries world
 
       -- install batteries provided by nedh
-      installNetBatteries world'
+      installNetBatteries world
 
       -- install batteries provided by sedh
-      installSwarmBatteries starter world'
+      installSwarmBatteries starter world
 
       -- call custom preparation
-      world <- worldCustomization world'
+      worldCustomization world
 
       if "" == workModu
         then swarmRepl console world

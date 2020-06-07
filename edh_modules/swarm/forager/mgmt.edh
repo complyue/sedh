@@ -6,23 +6,22 @@ import * 'swarm/RT'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
+case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
 
 import * './wsq'
-
 
 
 # worksource connection, and the team of workers employed by it
 export class WSC {
 
   method __init__ (
-    forager     as this.forager,
-    addr        as this.addr, 
-    hcPlanned   as this.hcPlanned,
-    executable  as this.executable,
-    workDir     as this.workDir,
-    workModu    as this.workModu,
-    priority    as this.priority,
+    forager as this.forager,
+    addr as this.addr,
+    hcPlanned as this.hcPlanned,
+    executable as this.executable,
+    workDir as this.workDir,
+    workModu as this.workModu,
+    priority as this.priority,
   ) pass
 
   # headcount reserved for this worksource
@@ -36,14 +35,14 @@ export class WSC {
 
   method __repr__() {
     '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
-      ++ mre(this.hcEmployed) ++ '/' ++ this.hcReserved
-      ++ '/' ++ this.hcPlanned ++ '>'
+    ++ mre( this.hcEmployed ) ++ '/' ++ this.hcReserved
+    ++ '/' ++ this.hcPlanned ++ '>'
   }
 
-  method key() repr(this.addr)
+  method key() repr( this.addr )
 
-  method engage (hcAvailable) {
-    this.hcReserved = min(hcAvailable, this.hcPlanned)
+  method engage ( hcAvailable ) {
+    this.hcReserved = min( hcAvailable, this.hcPlanned )
 
     {
       go {
@@ -54,11 +53,11 @@ export class WSC {
           this.forager.negoModu, this.addr, init=__init_nego__,
         ) of { clnt } -> {
           case clnt.addrs() of { addr =>_ } ->
-            console.debug<| 'Connected to worksource at: ' ++ addr
+          console.debug<| 'Connected to worksource at: ' ++ addr
           case clnt.eol() of {
             false -> { pass }
-            clnt.join()  # this normally throws
-            error('connection to worksource failed')
+            clnt.join() # this normally throws
+            error( 'connection to worksource failed' )
           }
         }
 
@@ -67,10 +66,10 @@ export class WSC {
       }
 
       # register this wsc
-      this.forager.wsd[this.key()] = this
-    } $=> { exc } -> {  # this catches exceptions occurred directly or
+      this.forager.wsd[ this.key() ] = this
+    } $=> { exc } -> { # this catches exceptions occurred directly or
       # in forked threads
-      console.error<| 'Stopping team '++this++' on error: ' ++ exc
+      console.error<| 'Stopping team ' ++this++ ' on error: ' ++ exc
       this.stop()
     }
 
@@ -82,28 +81,28 @@ export class WSC {
 
   # ever increasing number to track reform bumps
   reformNumber := sink
-  reformNumber <- 0  # initialize to 0
+  reformNumber <- 0 # initialize to 0
 
   # this method meant to be forked once per wsc
   method teamKeeper() {
     # terminate this thread on stop signal
     perceive stopped { break }
 
-    rfn = mre(this.reformNumber)
+    rfn = mre( this.reformNumber )
 
     # track delta of employment
     hcEmployed = 0
     go for hcConfirmed from this.hcEmployed do {
       if hcConfirmed > this.hcReserved then error (
-        'Worksource ' ++ this.addr ' confirming ' ++ hcConfirmed 
+        'Worksource ' ++ this.addr ' confirming ' ++ hcConfirmed
         ++ ' while only ' ++ this.hcReserved ++ ' reserved.'
       )
       console.debug<| 'Worksource ' ++ this.addr ++ ' confirmed '
-        ++ hcConfirmed ++ ' heads employed.'
+      ++ hcConfirmed ++ ' heads employed.'
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
-      ai {  # request reform
-        this.reformNumber <- mre(this.reformNumber) + 1
+      ai { # request reform
+        this.reformNumber <- mre( this.reformNumber ) + 1
       }
     }
 
@@ -119,8 +118,8 @@ export class WSC {
           this.addr,
           this.workDir, this.executable, this.workModu,
         ) of { wkrPid } -> {
-          this.workers[wkrPid] = this
-          this.forager.workerStarted <- pkargs(wkrPid, this)
+          this.workers[ wkrPid ] = this
+          this.forager.workerStarted <- pkargs( wkrPid, this )
         }
       }
     }
@@ -131,10 +130,10 @@ export class WSC {
     this.stopped <- true
 
     # forcefully stop all workers for this worksource
-    for (pid, _) from this.workers do {
+    for ( pid, _ ) from this.workers do {
       # make sure this worker process is killed
-      killWorker(pid)
-      this.workers[pid] = nil  # forget about it
+      killWorker( pid )
+      this.workers[ pid ] = nil # forget about it
     }
 
     # check unleash heads reserved for this worksource
@@ -143,8 +142,8 @@ export class WSC {
       this.hcReserved = 0
     }
     # forget about this worksource
-    ai case this.forager.wsd[this.key()] of this -> {
-      this.forager.wsd[this.key()] = nil
+    ai case this.forager.wsd[ this.key() ] of this -> {
+      this.forager.wsd[ this.key() ] = nil
     }
   }
 
@@ -168,7 +167,7 @@ export class Forager {
     headcount as this.headcount,
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
-    this.headcount >= 1 |> error('Invalid headcount: '++this.headcount)
+    this.headcount >= 1 |> error( 'Invalid headcount: ' ++this.headcount )
   }
 
   # prioritized recent queue for backlog of worksources
@@ -180,15 +179,15 @@ export class Forager {
   # in this format, and this intends to be exposed (imported) by a network
   # facing entry module of the sniffer, so as to react to cfws
   export method WorkToDo (
-    hcPlanned,     # planned headcount to recruit
-    executable,    # executable file path to launch as worker processes
-    workDir,       # working directory
-    workModu,      # work definition module
-    priority = 0,  # used to prioritize allocation of work heads
+    hcPlanned, # planned headcount to recruit
+    executable, # executable file path to launch as worker processes
+    workDir, # working directory
+    workModu, # work definition module
+    priority = 0, # used to prioritize allocation of work heads
   ) {
     case workModu of {
       { that.targetPrefix >@ _ } -> { pass }
-      return nil  # filtered out by prefix
+      return nil # filtered out by prefix
     }
 
     # `that.addr` is the worksource address we are supposed to connect,
@@ -196,19 +195,19 @@ export class Forager {
     #
     # such addr objects are non-equal from eachother in object semantics,
     # even from the same advertiser, so we use its repr str as identifier
-    wsKey = repr(that.addr)
+    wsKey = repr( that.addr )
     ai {
-      case this.wsd[wsKey] of {
-        { _ } -> { pass }  # already been worked on TODO update info ?
-        case this.wsq.iqd[wsKey] of {
+      case this.wsd[ wsKey ] of {
+        { _ } -> { pass } # already been worked on TODO update info ?
+        case this.wsq.iqd[ wsKey ] of {
           { wsc } -> {
             # already in queue, refresh its known states up-to-date
             wsc.update( hcPlanned, executable, workDir, workModu, priority, )
           }
-          this.wsq.enque(WSC(
-            forager=this, addr=that.addr,
-            hcPlanned, executable, workDir, workModu, priority,
-          ))
+          this.wsq.enque( WSC (
+              forager=this, addr=that.addr,
+              hcPlanned, executable, workDir, workModu, priority,
+          ) )
         }
       }
     }
@@ -218,26 +217,26 @@ export class Forager {
 
   # available headcounts to be offered
   hcIdle = sink
-  # stream of `pid:wsc` for ever started worker processes 
+  # stream of `pid:wsc` for ever started worker processes
   workerStarted = sink
 
   method scheduleTeams() {
 
     # maintain mapping from pid of live worker processes to its team manager
     workers = {}
-    go for (wkrPid, wsc) from this.workerStarted do workers[wkrPid] = wsc
+    go for ( wkrPid, wsc ) from this.workerStarted do workers[ wkrPid ] = wsc
 
     # track done of worker processes
-    go for (***_) from this.workerStarted do case waitAnyWorkerDone()
+    go for ( ***_ ) from this.workerStarted do case waitAnyWorkerDone()
     of { donePid:doneAct:doneDesc } -> {
       console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
-        ++ ' - ' ++ doneDesc
-      case workers[donePid] of { doneWSC } -> { ai {
-        # uncount this one from the team's number of working heads
-        doneWSC.workers[donePid] = nil
-        # request reform of the team
-        doneWSC.reformNumber <- mre(doneWSC.reformNumber) + 1
-        workers[donePid] = nil  # forget about it
+      ++ ' - ' ++ doneDesc
+      case workers[ donePid ] of { doneWSC } -> { ai {
+          # uncount this one from the team's number of working heads
+          doneWSC.workers[ donePid ] = nil
+          # request reform of the team
+          doneWSC.reformNumber <- mre( doneWSC.reformNumber ) + 1
+          workers[ donePid ] = nil # forget about it
       } }
     }
 
@@ -251,7 +250,7 @@ export class Forager {
     }
     # insert some zero idle counts periodicly, so the check in following loop
     # won't dead wait in case it can only partial fill for a long time
-    go for _ from console.everySeconds(1) do this.hcIdle <- 0
+    go for _ from console.everySeconds( 1 ) do this.hcIdle <- 0
 
     # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
@@ -259,25 +258,24 @@ export class Forager {
 
       # do wait if can not immediately fulfill all the heads
       if hcCum < this.headcount && hcCum < wsc.hcPlanned
-      then for _ from this.hcIdle do
-        # can fulfill now
-        (hcCum >= wsc.hcPlanned || hcCum >= this.headcount)
-        # or waited long enough while partial filling is possible
-        # TODO make the hardcoded 5 seconds tunable
-        || (hcCum > 0 && console.now() - nsLastIdle > 5e9)
-        -> { break }
+      then for _ from this.hcIdle
+      # can fulfill now
+      do ( hcCum >= wsc.hcPlanned || hcCum >= this.headcount )
+      # or waited long enough while partial filling is possible
+      # TODO make the hardcoded 5 seconds tunable
+      || ( hcCum > 0 && console.now() - nsLastIdle > 5e9 )
+      -> { break }
 
       console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
-        ++ hcCum ++ ' heads to offer.'
+      ++ hcCum ++ ' heads to offer.'
 
       # engage with this worksource with as many free heads atm
       # `engage()` should return quickly without waiting for network,
       # network operations are actually forbidden by the intrinsic tx of
       # assignment
-      hcCum -= wsc.engage(hcCum)
+      hcCum -= wsc.engage( hcCum )
     }
 
   }
 
 }
-

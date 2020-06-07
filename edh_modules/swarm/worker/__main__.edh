@@ -10,56 +10,56 @@ import * 'swarm/RT'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
+case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
 
 
 # take the worksource connection file describer, make it a peer for comm
 # note `wscTake()` performs IO, so assign its return value won't work
-case wscTake(senv.wscFd, Peer()) of { peer } -> {
+case wscTake( senv.wscFd, Peer() ) of { peer } -> {
   console.debug<| 'Took worker connection to worksource: ' ++ peer
 }
 
-jobSink = peer.armChannel(dataChan)
+jobSink = peer.armChannel( dataChan )
 
 effect {
-  ;@netPeer = peer
-  ;@dataSink = jobSink
+  ; @netPeer = peer
+  ; @dataSink = jobSink
 }
 
 
 # inherit the work module, so we have access to `@doOneJob` implemented there
 extends {
-  import (**_) senv.jobWorkModu
+  import ( **_ ) senv.jobWorkModu
 }
 
 
 # identify this connection as swarm worker to the headhunter, then it will
 # start sending ips to our data channel
-producer initiateJobs(outlet) {
-  peer.postCommand(expr
+producer initiateJobs( outlet ) {
+  peer.postCommand( expr
 
-StartWorking({$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $})
+    StartWorking( {$ senv.swarmWorkerPid $}, {$ senv.swarmManagerPid $} )
 
   )
   console.debug<| 'Started working for worksource ' ++ peer
 }
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for (***ips) from initiateJobs( outlet=jobSink ) do {
+go for ( ***ips ) from initiateJobs( outlet=jobSink ) do {
   console.debug<| 'Computing ips: ' ++ ips
 
-  case super.@doOneJob(***ips) of {
+  case super.@doOneJob( ***ips ) of {
     { result } -> {
       console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
-      peer.p2c(dataChan, repr(result))
+      peer.p2c( dataChan, repr( result ) )
     }
-    throw UsageError('Swarm job returned no result', ips=ips)
+    throw UsageError( 'Swarm job returned no result', ips=ips )
   } $=> { jobExc } -> {
-    console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - ' 
-      ++ senv.swarmManagerPid ++ '>' ++ senv.swarmWorkerPid ++ '] failure:\n'
-      ++ jobExc
-    peer.p2c(errChan, repr(jobExc))
-    break  # stop processing more jobs
+    console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - '
+    ++ senv.swarmManagerPid ++ '>' ++ senv.swarmWorkerPid ++ '] failure:\n'
+    ++ jobExc
+    peer.p2c( errChan, repr( jobExc ) )
+    break # stop processing more jobs
   }
 
 }
@@ -71,14 +71,14 @@ go for (***ips) from initiateJobs( outlet=jobSink ) do {
     # note a command resulting in nil is ignored here
     { cmdVal } -> {
       console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
-      cmdVal = nil  # clear it
+      cmdVal = nil # clear it
     }
   }
 
 } @=> {
   { exc } -> {
     console.error<| 'Disconnecting worker from worksource ' ++ peer
-      ++ ' for error: ' ++ exc
+    ++ ' for error: ' ++ exc
   }
   console.debug<| 'Disconnecting worker from worksource ' ++ peer
 }

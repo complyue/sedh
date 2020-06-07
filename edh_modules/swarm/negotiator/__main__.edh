@@ -4,12 +4,12 @@
 import * 'net/symbols'
 effect import * 'net/effects'
 
-import (Peer, **_) 'net/RT'
+import ( Peer, **_ ) 'net/RT'
 
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import (**_) 'swarm/ENV' } of { senv } -> { pass }
+case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
 
 import * 'swarm/forager/mgmt'
 
@@ -26,19 +26,19 @@ console.debug<| 'Swarm forager negotiating with worksource - ' ++ peer
 
 
 effect {
-  ;@netPeer = peer
-  ;@dataSink = peer.armChannel(dataChan ?:= 'data')
+  ; @netPeer = peer
+  ; @dataSink = peer.armChannel( dataChan ?:= 'data' )
 }
 
 
-producer offerHeads(outlet) {
-  peer.postCommand(expr
+producer offerHeads( outlet ) {
+  peer.postCommand( expr
 
-OfferHeads({$ senv.swarmManagerPid $}, {$ wsc.hcReserved $})
+    OfferHeads( {$ senv.swarmManagerPid $}, {$ wsc.hcReserved $} )
 
   )
 }
-offerHeads(outlet=peer.armChannel(dataChan, wsc.hcEmployed))
+offerHeads( outlet=peer.armChannel( dataChan, wsc.hcEmployed ) )
 # start the team keeper, it'll subscribe to wsc.hcEmployed, thus
 # trigger the offerHeads() producer
 go wsc.teamKeeper()
@@ -50,14 +50,14 @@ go wsc.teamKeeper()
     # note a command resulting in nil is ignored here
     { cmdVal } -> {
       console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
-      cmdVal = nil  # clear it
+      cmdVal = nil # clear it
     }
   }
 
 } @=> {
   { exc } -> {
     console.error<| 'Disconnected with worksource ' ++ peer
-      ++ ' for error: ' ++ exc
+    ++ ' for error: ' ++ exc
   }
   console.debug<| 'Disconnected with worksource ' ++ peer
 }

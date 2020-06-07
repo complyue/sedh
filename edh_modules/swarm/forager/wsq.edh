@@ -37,9 +37,9 @@ export class PRQ {
 
   method __init__(
     # the lease seconds a task should be kept in queue
-    lingers as this.lingers = 5*60,  # 5 minutes by default
+    lingers as this.lingers = 5*60, # 5 minutes by default
     # the max number of records should be kept in queue
-    backlog as this.backlog = 50,  # 50 by default
+    backlog as this.backlog = 50, # 50 by default
   ) pass
 
   # mapping addr key to worksources those in queue
@@ -49,56 +49,56 @@ export class PRQ {
 
   # queue change number, ever increasing as each new ws enqueued
   qcn = sink
-  qcn <- 0  # initialize to 0
+  qcn <- 0 # initialize to 0
 
   generator streamOut() while true {
     ai {
       case this.pv of {
-        { pcrq => rest'pv } -> case pcrq of {( _priority, crq )}
+        { pcrq => rest'pv } -> case pcrq of { ( _priority, crq ) }
         -> case crq.deq() of {
           { wsc } -> if crq.empty() then {
             # no more record at this priority
-            this.pv = rest'pv  # forget this crq
+            this.pv = rest'pv # forget this crq
           }
-          error('bug: empty CRQ in PRQ')
+          error( 'bug: empty CRQ in PRQ' )
         }
         # empty PRQ
         wsc = None
-        seen'qcn = mre(this.qcn)
+        seen'qcn = mre( this.qcn )
       }
     }
     if wsc != None then {
-      yield wsc  # engagement with this worksource expected
+      yield wsc # engagement with this worksource expected
       continue
     }
-    for qcn from this.qcn do {  # wait until queue changed
+    for qcn from this.qcn do { # wait until queue changed
       qcn != seen'qcn -> { break }
     }
   }
 
-  method enque(wsc) ai {
-    crq = this.crq(wsc.priority)
-    crq.enq(wsc) -> {
-      this.iqd[wsc.key()] = wsc
+  method enque( wsc ) ai {
+    crq = this.crq( wsc.priority )
+    crq.enq( wsc ) -> {
+      this.iqd[ wsc.key() ] = wsc
       # increase & post queue change number
-      qcn = mre(this.qcn)
+      qcn = mre( this.qcn )
       # do with some wrapback, don't grow the number too big
       this.qcn <- if qcn >= 1e6 then 1 else qcn+1
     }
     console.warn<| 'Worksource backlog queue full, dropping ' ++ wsc
   }
 
-  method crq(priority) ai {
+  method crq( priority ) ai {
     higher = []
     lower = this.pv
     while true case lower of {
-      { r => rest'pv } -> case r of {( p, crq )} -> {
+      { r => rest'pv } -> case r of { ( p, crq ) } -> {
         # already has a crq for this priority
         if priority == p then { return crq }
         # found the insert position for this priority
-        if priority  > p then {
-          crq = CRQ(this)
-          this.pv = higher >> ((priority, crq) => lower)
+        if priority > p then {
+          crq = CRQ( this )
+          this.pv = higher >> ( ( priority, crq ) => lower )
           return crq
         }
         # priority is lower
@@ -106,8 +106,8 @@ export class PRQ {
         lower = rest'pv
       }
       # create a crq with lowest priority
-      crq = CRQ(this)
-      this.pv = higher >> ((priority, crq) => lower)
+      crq = CRQ( this )
+      this.pv = higher >> ( ( priority, crq ) => lower )
       return crq
     }
   }
@@ -128,7 +128,7 @@ class CRQ {
   method __init__ ( prq as this.prq ) {
     # queue of worksources and their respective enque time,
     # each record being a tuple
-    this.l = MVector(length=this.prq.backlog)
+    this.l = MVector( length=this.prq.backlog )
   }
 
   rp = -1 wp = 0
@@ -138,23 +138,23 @@ class CRQ {
   method full() this.rp == this.wp
 
   # return a bool indicating whether successfully enqueued or not
-  method enq(wsc) ai {
+  method enq( wsc ) ai {
     t = console.now()
     lingerThres = t - this.prq.lingers * 1e9
 
     qfull = this.wp == this.rp
     if qfull then {
-      let (wsc', qt) = this.l[this.rp]
+      let ( wsc', qt ) = this.l[ this.rp ]
       # queue full of lingering wsc
       if qt > lingerThres then { return false }
       # pushed out of queue
-      this.prq.iqd[wsc'.key()] = nil
+      this.prq.iqd[ wsc'.key() ] = nil
     }
-    this.l[this.wp] = (wsc, t)
-    this.prq.iqd[wsc.key()] = wsc
+    this.l[ this.wp ] = ( wsc, t )
+    this.prq.iqd[ wsc.key() ] = wsc
     # previously empty
     if this.rp < 0 then this.rp = this.wp
-    this.wp += 1  # move the write pointer
+    this.wp += 1 # move the write pointer
     if this.wp >= this.l.length then this.wp = 0
     if qfull then this.rp = this.wp
 
@@ -164,18 +164,17 @@ class CRQ {
   method deq() ai {
     # queue empty
     if this.rp < 0 then { return nil }
-    case this.l[this.rp] of {
-      {( wsc, _qt )} -> { pass }
-      error('impossible')
+    case this.l[ this.rp ] of {
+      { ( wsc, _qt ) } -> { pass }
+      error( 'impossible' )
     }
     this.rp += 1
     if this.rp >= this.l.length then this.rp = 0
     # drained
     if this.rp == this.wp then this.rp = -1 this.wp = 0
     # forget about it
-    this.prq.iqd[wsc.key()] = nil
+    this.prq.iqd[ wsc.key() ] = nil
     return wsc
   }
 
 }
-

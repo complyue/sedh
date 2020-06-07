@@ -10,14 +10,14 @@ import * 'swarm/forager/mgmt'
 
 
 export method forageOn (
-  headcount    = 1,          # number of worker processes to vend
-  targetPrefix = '',         # prefix to filter out uninteresting work
-  swarmAddr    = '0.0.0.0',  # local addr to sniff for call-for-workers
-  swarmPort    = 3722,       # local port to sniff for call-for-workers
-  foragerModu  = 'swarm/forager',   # the forager reacting module
+  headcount = 1, # number of worker processes to vend
+  targetPrefix = '', # prefix to filter out uninteresting work
+  swarmAddr = '0.0.0.0', # local addr to sniff for call-for-workers
+  swarmPort = 3722, # local port to sniff for call-for-workers
+  foragerModu = 'swarm/forager', # the forager reacting module
 ) {
   method __init_forager__() {
-    that.forager = Forager(headcount)
+    that.forager = Forager( headcount )
     that.targetPrefix = targetPrefix
   }
 
@@ -33,9 +33,9 @@ export method forageOn (
   case sniffer.addrs() of {
     { addr =>_ } -> console.info<| 'Foraging at: ' ++ addr
     # or the network has failed, propagate the error
-    sniffer.join()  # this usually throws
+    sniffer.join() # this usually throws
     # in case join() didn't throw, report this error
-    error('Forager failed sniffing.')
+    error( 'Forager failed sniffing.' )
   }
 
   return sniffer

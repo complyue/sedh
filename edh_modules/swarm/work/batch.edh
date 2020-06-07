@@ -7,18 +7,17 @@ import * 'swarm/headhunter'
 
 
 export producer manageBatchJobs(
-  params,  # generator or producer providing all ips
+  params, # generator or producer providing all ips
   # finished jobs and their respective ips is posted into this sink
   outlet,
-) case HeadHunter(outlet) of { hh } -> {
-  for (***ips) from params() do {
+) case HeadHunter( outlet ) of { hh } -> {
+  for ( ***ips ) from params() do {
     console.debug<| 'Dispatching job ips=' ++ ips
     # blocking wait the job dispatched
-    hh.dispatchJob(ips)
+    hh.dispatchJob( ips )
   }
   console.info<| 'All jobs sent out.'
   hh.finishUp()
-} @=> {  # tell the headhunter to stop anyway
+} @=> { # tell the headhunter to stop anyway
   outlet <- nil
 }
-

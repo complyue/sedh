@@ -3,7 +3,7 @@
  # this is the forager/worker-facing entry module of a headhunter
  #}
 
-import (Peer, **_) 'net/RT'
+import ( Peer, **_ ) 'net/RT'
 import * 'net/symbols'
 effect import * 'net/effects'
 
@@ -13,8 +13,8 @@ console.debug<| 'Swarm forager/worker connected - ' ++ peer
 
 
 effect {
-  ;@netPeer = peer
-  ;@dataSink = peer.armChannel(dataChan ?:= 'data')
+  ; @netPeer = peer
+  ; @dataSink = peer.armChannel( dataChan ?:= 'data' )
 }
 
 
@@ -24,14 +24,14 @@ effect {
     # note a command resulting in nil is ignored here
     { cmdVal } -> {
       console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
-      cmdVal = nil  # clear it
+      cmdVal = nil # clear it
     }
   }
 
 } @=> {
   { exc } -> {
     console.warn<| 'Disconnected with swarm forager/worker ' ++ peer
-      ++ ' for error: ' ++ exc
+    ++ ' for error: ' ++ exc
   }
   console.debug<| 'Disconnected with swarm forager/worker ' ++ peer
 }

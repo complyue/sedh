@@ -12,7 +12,7 @@ export import * 'swarm'
 # demonstration, many of such procedures should be imported
 # from modular libraries instead, likely with unique symbols
 # provided by those libraries to avoid naming clash.
-method computeIt(z) {
+method computeIt( z ) {
   # expecting an effectful value identified by attribute
   # name `c` on call stack
   r = perform c * z
@@ -21,13 +21,13 @@ method computeIt(z) {
 }
 
 
-# (hyper) parameters and their default values to be worked on 
+# (hyper) parameters and their default values to be worked on
 
 # import parameters from a module serving edit-to-config purpose
 import * './etc'
 
 # more parameters with their default values
-let (m, n) = (3, 7)
+let ( m, n ) = ( 3, 7 )
 
 {#
  # this is the job entry for each one particular ips (instantiated
@@ -49,10 +49,10 @@ export method @doOneJob * {
   # define their own symbols used to identify the expected effects,
   # instead of the alphanumeric name `c` as demonstrated here.
   effect c = m + n
-  case computeIt(m * n) of { r } -> { pass }
+  case computeIt( m * n ) of { r } -> { pass }
 
   # simulate computation time cost, each taking 3 seconds.
-  for ts from console.everySeconds(3) do { break }
+  for ts from console.everySeconds( 3 ) do { break }
   # or no artificial delay
   # ts = console.now()
 
@@ -77,28 +77,28 @@ export method @doOneJob * {
  #
  # see: what effectful configs/callbacks are performed from
  # 'swarm/headhunter' for swarm/work tuning options
- # 
+ #
  #}
 export method manageThisWork * {
 
   # log and retry on job failure
-  effect method @shouldRetryJob (jobExc, ips) {
+  effect method @shouldRetryJob ( jobExc, ips ) {
     console.error<| 'Job failed: ' ++ jobExc
-    return ips  # retry the same ips 
+    return ips # retry the same ips
     # a different ips can be returned from here to retry
   }
 
   generator iterParams() {
-    for m from m_range() do 
+    for m from m_range() do
     for n from n_range() do
-    not exclude(m, n) -> {
+    not exclude( m, n ) -> {
       yield pkargs( m=m, n=n, )
     }
   }
 
-  for (ips, result) from manageBatchJobs( iterParams ) do {
-    console.print('Job computed.', ips=ips, result=result,)
+  for ( ips, result ) from manageBatchJobs( iterParams ) do {
+    console.print( 'Job computed.', ips=ips, result=result, )
   }
 
-  console.print('All done.')
+  console.print( 'All done.' )
 }

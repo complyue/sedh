@@ -8,7 +8,7 @@ import * 'swarm/symbols'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
+case import (** _ ) 'swarm/ENV' of { senv } -> { pass }
 
 
 export class HeadHunter {
@@ -64,9 +64,12 @@ export class HeadHunter {
 
     # employ heads from this forager
     ai case this.foragers[ that.peer ] of {
-      nil -> this.foragers[ that.peer ] = ( forager = Forager(
+      nil -> {
+        forager = Forager(
           that.peer, foragerPid, maxHC,
-      ) )
+        )
+        this.foragers[ that.peer ] = forager
+      }
       { forager } -> {
         # update max headcount it is able to provide
         forager.maxHC = maxHC
@@ -171,7 +174,8 @@ export class HeadHunter {
         this.hcEmployed = hcEmployed
       }
 
-      if ( hcDemand = this.headcount - hcEmployed ) > 0 then {
+      hcDemand = this.headcount - hcEmployed
+      if hcDemand > 0 then {
         console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
         ++ cfw.addrs()
         cfw.post( expr
@@ -217,8 +221,8 @@ export class HeadHunter {
     producer submitJob( outlet ) {
       worker.peer.p2c( dataChan, repr( ips ) )
     }
-    for ( ***result ) from submitJob( outlet=jobSink ) do {
-      this.resultSink <- pkargs( ips, result )
+    for (*** result ) from submitJob( outlet=jobSink ) do {
+      this.resultSink <- ( ips, result )
       this.pendingCntr <- mre( this.pendingCntr ) - 1
       this.idleWorkers.push( worker )
       this.workerAvailable <- worker

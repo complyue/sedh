@@ -111,10 +111,10 @@ wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExec
       (show v)
   prepCmdl :: EdhProgState -> ([String] -> STM ()) -> STM ()
   prepCmdl !pgs !exit' = case jobExecutable of
-    EdhString !executable  -> exit' [T.unpack executable]
-    EdhTuple  !vs          -> strSeq pgs vs [] exit'
-    EdhList   (List _ !lv) -> readTVar lv >>= \vs -> strSeq pgs vs [] exit'
-    _                      -> throwEdhSTM pgs UsageError "Invalid jobExecutable"
+    EdhString !executable -> exit' [T.unpack executable]
+    EdhArgsPack (ArgsPack !vs _) -> strSeq pgs vs [] exit'
+    EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq pgs vs [] exit'
+    _ -> throwEdhSTM pgs UsageError "Invalid jobExecutable"
 wscStartWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 

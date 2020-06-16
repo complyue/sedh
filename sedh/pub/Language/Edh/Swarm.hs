@@ -58,14 +58,14 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
              [ ( EdhMethod
                , "killWorker"
                , killWorkerProc
-               , PackReceiver [RecvArg "pid" Nothing Nothing]
+               , PackReceiver [mandatoryArg "pid"]
                )
              , ( EdhMethod
                , "wscTake"
                , wscTakeProc
                , PackReceiver
-                 [ RecvArg "wscFd"   Nothing Nothing
-                 , RecvArg "peerObj" Nothing Nothing
+                 [ mandatoryArg "wscFd"
+                 , mandatoryArg "peerObj"
                  ]
                )
              , ( EdhMethod
@@ -77,10 +77,10 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
                , "wscStartWorker"
                , wscStartWorkerProc
                , PackReceiver
-                 [ RecvArg "wsAddr"     Nothing Nothing
-                 , RecvArg "workDir"    Nothing Nothing
-                 , RecvArg "executable" Nothing Nothing
-                 , RecvArg "workModu"   Nothing Nothing
+                 [ mandatoryArg "wsAddr"
+                 , mandatoryArg "workDir"
+                 , mandatoryArg "executable"
+                 , mandatoryArg "workModu"
                  ]
                )
              ]

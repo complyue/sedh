@@ -6,7 +6,7 @@ import * 'swarm/RT'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
+case { import (** _ ) 'swarm/ENV' } of { senv } -> { pass }
 
 import * './wsq'
 
@@ -119,7 +119,7 @@ export class WSC {
           this.workDir, this.executable, this.workModu,
         ) of { wkrPid } -> {
           this.workers[ wkrPid ] = this
-          this.forager.workerStarted <- pkargs( wkrPid, this )
+          this.forager.workerStarted <- ( wkrPid, this )
         }
       }
     }
@@ -227,7 +227,7 @@ export class Forager {
     go for ( wkrPid, wsc ) from this.workerStarted do workers[ wkrPid ] = wsc
 
     # track done of worker processes
-    go for ( ***_ ) from this.workerStarted do case waitAnyWorkerDone()
+    go for (*** _ ) from this.workerStarted do case waitAnyWorkerDone()
     of { donePid:doneAct:doneDesc } -> {
       console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
       ++ ' - ' ++ doneDesc

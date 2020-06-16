@@ -57,7 +57,7 @@ export method @doOneJob * {
   # ts = console.now()
 
   # prepare the result to be returned
-  result = pkargs(
+  result = (
     r=r, ts=ts,
   )
 
@@ -92,7 +92,7 @@ export method manageThisWork * {
     for m from m_range() do
     for n from n_range() do
     not exclude( m, n ) -> {
-      yield pkargs( m=m, n=n, )
+      yield ( m=m, n=n, )
     }
   }
 

@@ -2,6 +2,8 @@
 module Language.Edh.Swarm
   ( installSwarmBatteries
   , startSwarmWork
+  , startSwarmWork'
+  , swarmRepl
   , SwarmWorkStarter(..)
   , determineSwarmWorkStarter
   )
@@ -63,10 +65,7 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
              , ( EdhMethod
                , "wscTake"
                , wscTakeProc
-               , PackReceiver
-                 [ mandatoryArg "wscFd"
-                 , mandatoryArg "peerObj"
-                 ]
+               , PackReceiver [mandatoryArg "wscFd", mandatoryArg "peerObj"]
                )
              , ( EdhMethod
                , "waitAnyWorkerDone"
@@ -99,7 +98,12 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
 
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
-startSwarmWork !worldCustomization = do
+startSwarmWork !worldCustomization =
+  startSwarmWork' swarmRepl worldCustomization
+
+startSwarmWork'
+  :: (EdhConsole -> EdhWorld -> IO ()) -> (EdhWorld -> IO ()) -> IO ()
+startSwarmWork' !doRepl !worldCustomization = do
   starter@(SwarmWorkStarter _executable _workDir workModu managerPid workerPid wscFd) <-
     determineSwarmWorkStarter
 
@@ -126,7 +130,7 @@ startSwarmWork !worldCustomization = do
       worldCustomization world
 
       if "" == workModu
-        then swarmRepl console world
+        then doRepl console world
         else if wscFd == 0
           then runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
             Left !err -> atomically $ do

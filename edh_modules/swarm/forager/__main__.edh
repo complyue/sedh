@@ -48,7 +48,7 @@ false -> { # this block is impossible to run
 
 
 # loop forever until eol on error, or stopped elsewhere
-while false == eol() {
+while eol() is false {
 
   # note nil result from `sniff()` is very much expected,
   # and is silently ignored

@@ -137,8 +137,8 @@ export class HeadHunter {
 
   method allFinished() {
     finished = # note this has an implicit tx which is desirable here
-    mre( this.finishingUp ) == true
-    && mre( this.pendingCntr ) == 0
+    mre( this.finishingUp ) is true
+    && mre( this.pendingCntr ) is 0
     && null( this.pendingJobs )
     ; | finished -> this.finished <- true
     return false
@@ -210,7 +210,7 @@ export class HeadHunter {
       }
 
       # failed to get a result, but we know it's not pending now
-      if nil == mre( jobSink ) then {
+      if mre( jobSink ) is nil then {
         this.pendingCntr <- mre( this.pendingCntr ) - 1
         jobSink <- nil
       }
@@ -233,7 +233,7 @@ export class HeadHunter {
   method submitJobs() {
     while true {
       ips = this.pendingJobs.pop()
-      ips == None -> { return nil } # no more pending jobs
+      ips is None -> { return nil } # no more pending jobs
       this.pendingCntr <- 1 + ( mre( this.pendingCntr ) |> 0 )
 
       while true {

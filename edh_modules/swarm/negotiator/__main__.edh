@@ -9,7 +9,7 @@ import ( Peer, **_ ) 'net/RT'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import ( **_ ) 'swarm/ENV' } of { senv } -> { pass }
+case { import (**_ ) 'swarm/ENV' } of { senv } -> { pass }
 
 import * 'swarm/forager/mgmt'
 
@@ -46,7 +46,7 @@ go wsc.teamKeeper()
 
 {
 
-  while false == peer.eol() case peer.readCommand() of {
+  while peer.eol() is false case peer.readCommand() of {
     # note a command resulting in nil is ignored here
     { cmdVal } -> {
       console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal

@@ -20,7 +20,7 @@ effect {
 
 {
 
-  while false == peer.eol() case peer.readCommand() of {
+  while peer.eol() is false case peer.readCommand() of {
     # note a command resulting in nil is ignored here
     { cmdVal } -> {
       console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal

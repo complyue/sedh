@@ -135,14 +135,14 @@ class CRQ {
 
   method empty() this.rp < 0
 
-  method full() this.rp == this.wp
+  method full() this.rp is this.wp
 
   # return a bool indicating whether successfully enqueued or not
   method enq( wsc ) ai {
     t = console.now()
     lingerThres = t - this.prq.lingers * 1e9
 
-    qfull = this.wp == this.rp
+    qfull = this.wp is this.rp
     if qfull then {
       let ( wsc', qt ) = this.l[ this.rp ]
       # queue full of lingering wsc
@@ -171,7 +171,7 @@ class CRQ {
     this.rp += 1
     if this.rp >= this.l.length then this.rp = 0
     # drained
-    if this.rp == this.wp then this.rp = -1 this.wp = 0
+    if this.rp is this.wp then this.rp = -1 this.wp = 0
     # forget about it
     this.prq.iqd[ wsc.key() ] = nil
     return wsc

@@ -23,7 +23,6 @@ import qualified Data.HashMap.Strict           as Map
 import           Language.Edh.EHI
 import           Language.Edh.Net
 
-import           Language.Edh.Swarm.Deque
 import           Language.Edh.Swarm.Starter
 import           Language.Edh.Swarm.Worker
 
@@ -55,38 +54,35 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
 
       moduArts <-
         sequence
-        $  [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-           | (mc, nm, hp, args) <-
-             [ ( EdhMethod
-               , "killWorker"
-               , killWorkerProc
-               , PackReceiver [mandatoryArg "pid"]
-               )
-             , ( EdhMethod
-               , "wscTake"
-               , wscTakeProc
-               , PackReceiver [mandatoryArg "wscFd", mandatoryArg "peerObj"]
-               )
-             , ( EdhMethod
-               , "waitAnyWorkerDone"
-               , waitAnyWorkerDoneProc
-               , PackReceiver []
-               )
-             , ( EdhMethod
-               , "wscStartWorker"
-               , wscStartWorkerProc
-               , PackReceiver
-                 [ mandatoryArg "wsAddr"
-                 , mandatoryArg "workDir"
-                 , mandatoryArg "executable"
-                 , mandatoryArg "workModu"
-                 ]
-               )
-             ]
-           ]
-        ++ [ (nm, ) <$> mkHostClass moduScope nm True hc
-           | (nm, hc) <- [("Deque", dequeHostCtor)]
-           ]
+          $ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+            | (mc, nm, hp, args) <-
+              [ ( EdhMethod
+                , "killWorker"
+                , killWorkerProc
+                , PackReceiver [mandatoryArg "pid"]
+                )
+              , ( EdhMethod
+                , "wscTake"
+                , wscTakeProc
+                , PackReceiver [mandatoryArg "wscFd", mandatoryArg "peerObj"]
+                )
+              , ( EdhMethod
+                , "waitAnyWorkerDone"
+                , waitAnyWorkerDoneProc
+                , PackReceiver []
+                )
+              , ( EdhMethod
+                , "wscStartWorker"
+                , wscStartWorkerProc
+                , PackReceiver
+                  [ mandatoryArg "wsAddr"
+                  , mandatoryArg "workDir"
+                  , mandatoryArg "executable"
+                  , mandatoryArg "workModu"
+                  ]
+                )
+              ]
+            ]
 
       artsDict <- createEdhDict
         $ Map.fromList [ (EdhString k, v) | (k, v) <- moduArts ]

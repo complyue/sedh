@@ -128,7 +128,7 @@ class CRQ {
   method __init__ ( prq as this.prq ) {
     # queue of worksources and their respective enque time,
     # each record being a tuple
-    this.l = MVector( length=this.prq.backlog )
+    this.l = Vector( length=this.prq.backlog )
   }
 
   rp = -1 wp = 0
@@ -155,7 +155,7 @@ class CRQ {
     # previously empty
     if this.rp < 0 then this.rp = this.wp
     this.wp += 1 # move the write pointer
-    if this.wp >= this.l.length then this.wp = 0
+    if this.wp >= this.l.length() then this.wp = 0
     if qfull then this.rp = this.wp
 
     return true
@@ -169,7 +169,7 @@ class CRQ {
       error( 'impossible' )
     }
     this.rp += 1
-    if this.rp >= this.l.length then this.rp = 0
+    if this.rp >= this.l.length() then this.rp = 0
     # drained
     if this.rp is this.wp then this.rp = -1 this.wp = 0
     # forget about it

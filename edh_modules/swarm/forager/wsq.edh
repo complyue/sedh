@@ -128,6 +128,10 @@ class CRQ {
   method __init__ ( prq as this.prq ) {
     # queue of worksources and their respective enque time,
     # each record being a tuple
+    #
+    # Note Vector is non-transactional container, correctness under
+    # concurrency must be guaranteed by carefully manipulation of
+    # rp/wp wrt STM semantics
     this.l = Vector( length=this.prq.backlog )
   }
 
@@ -161,17 +165,20 @@ class CRQ {
     return true
   }
 
-  method deq() ai {
+  # return nil when queue is empty, or the next eligible worksource is popped
+  # out and returned
+  method deq() while true ai {
     # queue empty
     if this.rp < 0 then { return nil }
     case this.l[ this.rp ] of {
-      { ( wsc, _qt ) } -> { pass }
-      error( 'impossible' )
+      { ( wsc, _qt ) } -> this.l[ this.rp ] = nil
+      # dirty read, this is possible as Vector is non-transactional container
+      continue
     }
     this.rp += 1
     if this.rp >= this.l.length() then this.rp = 0
     # drained
-    if this.rp is this.wp then this.rp = -1 this.wp = 0
+    if this.rp is this.wp then { this.rp = -1 this.wp = 0 }
     # forget about it
     this.prq.iqd[ wsc.key() ] = nil
     return wsc

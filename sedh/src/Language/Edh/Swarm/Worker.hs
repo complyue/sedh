@@ -14,7 +14,6 @@ import           Control.Concurrent.STM
 
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.HashMap.Strict           as Map
 import           Data.Dynamic
 
 import           Network.Socket
@@ -64,7 +63,7 @@ waitAnyWorkerDoneProc _ !exit = ask >>= \pgs ->
 
 wscStartWorkerProc :: EdhProcedure
 wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExecutable, EdhString !workModu] !kwargs) !exit
-  | Map.null kwargs
+  | odNull kwargs
   = ask >>= \pgs -> contEdhSTM $ prepCmdl pgs $ \wkrCmdl ->
     serviceAddressFrom pgs wsAddrObj $ \(servAddr, servPort) -> do
       wkrPidVar <- newTVar (0 :: Int)
@@ -119,7 +118,7 @@ wscStartWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 
 killWorkerProc :: EdhProcedure
-killWorkerProc (ArgsPack [EdhDecimal !wkrPid] !kwargs) !exit | Map.null kwargs =
+killWorkerProc (ArgsPack [EdhDecimal !wkrPid] !kwargs) !exit | odNull kwargs =
   case D.decimalToInteger wkrPid of
     Nothing   -> throwEdh UsageError $ "Invalid pid: " <> T.pack (show wkrPid)
     Just !pid -> ask >>= \pgs ->
@@ -140,7 +139,7 @@ killWorkerProc _ _ = throwEdh UsageError "Invalid args"
 
 wscTakeProc :: EdhProcedure
 wscTakeProc (ArgsPack [EdhDecimal !wscFd, EdhObject !peerObj] !kwargs) !exit
-  | Map.null kwargs = do
+  | odNull kwargs = do
     pgs <- ask
     case D.decimalToInteger wscFd of
       Nothing -> throwEdh UsageError $ "bad wsc fd: " <> T.pack (show wscFd)

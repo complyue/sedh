@@ -84,7 +84,8 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
               ]
             ]
 
-      artsDict <- createEdhDict [ (EdhString k, v) | (k, v) <- moduArts ]
+      artsDict <- EdhDict
+        <$> createEdhDict [ (EdhString k, v) | (k, v) <- moduArts ]
       updateEntityAttrs pgs (objEntity modu)
         $  [ (AttrByName k, v) | (k, v) <- moduArts ]
         ++ [(AttrByName "__exports__", artsDict)]

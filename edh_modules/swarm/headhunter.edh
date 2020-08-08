@@ -264,7 +264,7 @@ export class HeadHunter {
 
   method finishUp() {
     this.finishingUp <- true
-    not this.allFinished() ->
+    this.allFinished() -> { return nil }
     for _ from this.finished do { break }
   }
 

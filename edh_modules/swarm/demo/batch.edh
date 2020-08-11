@@ -52,9 +52,9 @@ export method @doOneJob * {
   case computeIt( m * n ) of { r } -> { pass }
 
   # simulate computation time cost, each taking 3 seconds.
-  for ts from console.everySeconds( 3 ) do { break }
+  # for ts from console.everySeconds( 3 ) do { break }
   # or no artificial delay
-  # ts = console.now()
+  ts = console.now()
 
   # prepare the result to be returned
   result = (
@@ -63,7 +63,7 @@ export method @doOneJob * {
 
   console.debug<| 'Returning result ' ++ result
   # return result of the job
-  return result
+  return {} =< result
 }
 
 
@@ -92,7 +92,7 @@ export method manageThisWork * {
     for m from m_range() do
     for n from n_range() do
     not exclude( m, n ) -> {
-      yield ( m=m, n=n, )
+      yield {} =<( m=m, n=n, )
     }
   }
 

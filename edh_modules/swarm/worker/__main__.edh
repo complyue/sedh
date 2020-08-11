@@ -5,6 +5,7 @@
 import * 'net'
 
 import * 'swarm/symbols'
+import * 'swarm/compat'
 import * 'swarm/RT'
 
 # work definition scripts are allowed to change the inferred
@@ -45,10 +46,10 @@ producer initiateJobs( outlet ) {
 }
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for (*** ips ) from initiateJobs( outlet=jobSink ) do {
+go for ips from initiateJobs( outlet=jobSink ) do {
   console.debug<| 'Computing ips: ' ++ ips
 
-  case super.@doOneJob(*** ips ) of {
+  case super.@doOneJob(** ips ) of {
     { result } -> {
       console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
       peer.p2c( dataChan, repr( result ) )

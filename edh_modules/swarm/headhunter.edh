@@ -21,7 +21,7 @@ export class HeadHunter {
     hcEmployed = 0
     hcWorking = 0
     method __init__(
-      peer as this.peer, pid as this.pid, maxHC as this.maxHC,
+      peer as this.peer, pid as this.pid,
     ) pass
   }
 
@@ -66,16 +66,12 @@ export class HeadHunter {
     ai case this.foragers[ that.peer ] of {
       nil -> {
         forager = Forager(
-          that.peer, foragerPid, maxHC,
+          that.peer, foragerPid,
         )
         this.foragers[ that.peer ] = forager
       }
-      { forager } -> {
-        # update max headcount it is able to provide
-        forager.maxHC = maxHC
-      }
+      { forager } -> { pass }
     }
-    # todo could this possibily exceed its maxHC ?
     forager.hcEmployed += hcToEmploy
     console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
     ++ that.peer.ident() ++ ' now.'
@@ -96,17 +92,15 @@ export class HeadHunter {
     return nil
   }
 
-  method __swarm_conn_init__() {
-    that.OfferHeads = this.OfferHeads
-    that.StartWorking = this.StartWorking
-  }
-
   case Server (
     'swarm/headhunter', # the service module
     perform swarmIface $=> '0.0.0.0', # local addr to bind
     0, # local port to bind
     # per-connection peer module initialization
-    init=__swarm_conn_init__,
+    init=method swarm'conn'init () {
+      that.OfferHeads = this.OfferHeads
+      that.StartWorking = this.StartWorking
+    },
   ) of { server } -> {
     case server.addrs() of {
       { wsAddr =>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
@@ -133,26 +127,22 @@ export class HeadHunter {
   pendingJobs = [] # FILO queue
   pendingCntr = sink # increased/decreased on job submit/result/err
   finishingUp = sink # signal of no more jobs, i.e. to start finishing up
-  finished = sink # the final singal that all have finished
 
   method allFinished() {
-    finished = # note this has an implicit tx which is desirable here
+    eos( this.resultSink ) -> true
+
     mre( this.finishingUp ) is true
     && mre( this.pendingCntr ) is 0
     && null( this.pendingJobs )
-    ; | finished -> this.finished <- true
+    -> {
+      this.resultSink <- nil
+      return true
+    }
+
     return false
   }
 
   method __init__( resultSink as this.resultSink ) go {
-    # stop immediately on the last signal that all have finished
-    perceive this.finishingUp {
-      this.allFinished() -> { break }
-    }
-    perceive this.pendingCntr 0 -> {
-      this.allFinished() -> { break }
-    }
-
     # advertise call-for-workers when there's demand
     for _ from console.everySeconds(
       perform cfwInterval $=> 3, # use effectful config
@@ -163,11 +153,10 @@ export class HeadHunter {
 
       # calibrate this.hcEmployed, wrt forager disconnection etc.
       hcEmployed = 0
-      for ( peer, forager ) from this.foragers do {
-        if false != peer.eol() then {
-          this.foragers[ peer ] = nil # forget about it
-        }
-        hcEmployed += forager.hcEmployed
+      for ( peer, forager ) from this.foragers
+      do case peer.eol() of {
+        false -> hcEmployed += forager.hcEmployed
+        this.foragers[ peer ] = nil # forget about it
       }
       if this.hcEmployed != hcEmployed then {
         console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
@@ -185,7 +174,7 @@ export class HeadHunter {
             {$ senv.jobExecutable $},
             {$ senv.jobWorkDir $},
             {$ senv.jobWorkModu $},
-            {$ priority $},
+            {$ this.priority $},
           )
 
         )
@@ -194,7 +183,7 @@ export class HeadHunter {
   }
 
   method trackJob( worker, ips ) {
-    # arm new private data/err channels to this job
+    # arm a new private data channel to this job
     jobSink = worker.peer.armChannel( dataChan )
     # perform retry effect on error
     perceive worker.peer.armedChannel( errChan ) { jobExc } -> {
@@ -218,10 +207,9 @@ export class HeadHunter {
       break # terminate this thread
     }
     # submit ips and process result
-    producer submitJob( outlet ) {
+    for result from ( outlet=jobSink ) | producer submitJob( outlet ) {
       worker.peer.p2c( dataChan, repr( ips ) )
-    }
-    for (*** result ) from submitJob( outlet=jobSink ) do {
+    } do {
       this.resultSink <- ( ips, result )
       this.pendingCntr <- mre( this.pendingCntr ) - 1
       this.idleWorkers.push( worker )
@@ -264,8 +252,10 @@ export class HeadHunter {
 
   method finishUp() {
     this.finishingUp <- true
-    this.allFinished() -> { return nil }
-    for _ from this.finished do { break }
+
+    perceive this.pendingCntr 0 -> this.allFinished()
+
+    for (*** _ ) from this.resultSink do { pass }
   }
 
 }

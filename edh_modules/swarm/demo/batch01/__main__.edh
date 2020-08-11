@@ -1,25 +1,30 @@
 
-# this is an entry moduel to hook up some worker nodes from the swarm,
-# to accomplish the work defined in some module, with arbitrary overrides
-# possible from this module
+{#
+ # this is an entry moduel to hook up some worker nodes from the swarm,
+ # to accomplish the work defined in some module, with arbitrary overrides
+ # possible from this module
 
-# it's a good idea to archive this file as part of the result data done by
-# the swarm, even version control them
+ # it's a good idea to archive this file as part of the result data done by
+ # the swarm, even version control them
 
-# import reusable work definition from some module
-#
-# don't put too much logic in this entry module, an entry module should just
-# like a comprehensive command line, don't  program the command line, or you
-# are going to repeat yourself in duplicating works in such entry modules
-import * 'swarm/demo/batch'
+ # don't put too much logic in this entry module, an entry module should just
+ # like a comprehensive command line, don't program the command line, or you
+ # are going to repeat yourself in duplicating works in such entry modules
+ #}
 
+JOB_WORK_MODU = 'swarm/demo/batch'
 
 # work definition scripts are allowed to change the inferred configuration in
 # 'swarm/ENV', import it as a namespace here, to change it as appropriate
-case { import ( **_ ) 'swarm/ENV' } of { senv } -> {
+case { import (** _ ) 'swarm/ENV' } of { senv } -> {
+  senv.jobWorkModu = JOB_WORK_MODU
+
   # uncomment so modified code get re-compiled during job running
   # senv.jobExecutable = ('cabal', 'run', 'gwd')
 }
+
+# import reusable work definition from some module
+import * JOB_WORK_MODU
 
 
 { # hyper parameters
@@ -63,4 +68,4 @@ case { import ( **_ ) 'swarm/ENV' } of { senv } -> {
 # exported from this module, i.e. `__exports__`, those will shadow what's in
 # its lexical module global scope, including those imported from './etc'
 # and elsewhere
-manageThisWork ( **__exports__ )
+manageThisWork (** __exports__ )

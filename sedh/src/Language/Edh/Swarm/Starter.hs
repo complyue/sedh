@@ -23,10 +23,10 @@ data SwarmWorkStarter = SwarmWorkStarter {
 
 determineSwarmWorkStarter :: IO SwarmWorkStarter
 determineSwarmWorkStarter = do
-  execPath <- getExecutablePath
-  pwd      <- getCurrentDirectory
-  ppid     <- getParentProcessID
-  pid      <- getProcessID
+  !execPath <- getExecutablePath
+  !pwd      <- getCurrentDirectory
+  !ppid     <- getParentProcessID
+  !pid      <- getProcessID
   getArgs >>= \case
     -- no arg, will run as forager or repl
     [] -> return SwarmWorkStarter { swarm'executable  = T.pack execPath

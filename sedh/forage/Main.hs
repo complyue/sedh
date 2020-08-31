@@ -19,11 +19,11 @@ import           Language.Edh.Swarm
 
 main :: IO ()
 main = do
-  starter <- determineSwarmWorkStarter
+  !starter <- determineSwarmWorkStarter
 
-  console <- defaultEdhConsole defaultEdhConsoleSettings
-  let consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
-      runForager = do
+  !console <- defaultEdhConsole defaultEdhConsoleSettings
+  let !consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
+      runIt       = do
 
         world <- createEdhWorld console
         installEdhBatteries world
@@ -49,7 +49,7 @@ main = do
                 EdhString msg -> msg
                 _             -> T.pack $ show phv
 
-  void $ forkFinally runForager $ \result -> do
+  void $ forkFinally runIt $ \ !result -> do
     case result of
       Left (e :: SomeException) ->
         atomically $ consoleOut $ "💥 " <> T.pack (show e)

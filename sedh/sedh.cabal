@@ -56,7 +56,7 @@ executable gwd
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
                         BangPatterns TupleSections ScopedTypeVariables
-    ghc-options: -Wall -threaded
+    ghc-options: -Wall -threaded "-with-rtsopts=-maxN31 -qg -I0"
     build-depends:
         sedh -any,
         nedh -any,
@@ -76,7 +76,7 @@ executable forage
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
                         BangPatterns TupleSections ScopedTypeVariables
-    ghc-options: -Wall -threaded
+    ghc-options: -Wall -threaded -rtsopts "-with-rtsopts=-maxN2 -qg"
     build-depends:
         sedh -any,
         nedh -any,

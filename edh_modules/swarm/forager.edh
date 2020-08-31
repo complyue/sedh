@@ -16,19 +16,42 @@ export method forageOn (
   swarmPort = 3722, # local port to sniff for call-for-workers
   foragerModu = 'swarm/forager', # the forager reacting module
 ) {
-  method __init_forager__() {
-    that.forager = Forager( headcount )
-    that.targetPrefix = targetPrefix
+
+  # artifacts should be implanted into the cfw facing module
+  namespace cfw'arts () export {
+
+    # the forager instance
+    forager = Forager( headcount )
+
+    # re-export (as to expose) forager's reacting (exported) methods there,
+    # as to be callable by sniffed commands
+    import * forager
+
   }
 
-  case Sniffer(
+  # effects should be implanted into the cfw facing module
+  namespace cfw'effs () export {
+
+    method ignoreWorkModu( workModu ) case workModu of {
+      { targetPrefix >@ _ } -> false
+      _ -> true
+    }
+
+  }
+
+  sniffer = Sniffer(
     # sniffer module
     foragerModu,
     # addr/port to sniff on
     swarmAddr, swarmPort,
     # sniffer module initializer
-    init = __init_forager__,
-  ) of { sniffer } -> { pass }
+    init = method _ () {
+      # implant the forager instance ets.
+      import * cfw'arts into that
+      # provide effects like filtering etc.
+      effect import * cfw'effs into that
+    },
+  )
 
   case sniffer.addrs() of {
     { addr =>_ } -> console.info<| 'Foraging at: ' ++ addr

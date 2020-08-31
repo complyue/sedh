@@ -30,13 +30,10 @@ installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
 installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid workerPid wscFd) !world
   = do
 
-    void $ installEdhModule world "swarm/ENV" $ \pgs exit -> do
+    void $ installEdhModule world "swarm/ENV" $ \ !ets !exit -> do
 
-      let moduScope = contextScope $ edh'context pgs
-          modu      = thisObject moduScope
-      updateEntityAttrs
-        pgs
-        (objEntity modu)
+      let !moduScope = contextScope $ edh'context ets
+      iopdUpdate
         [ (AttrByName "jobExecutable"  , EdhString executable)
         , (AttrByName "jobWorkDir"     , EdhString workDir)
         , (AttrByName "jobWorkModu"    , EdhString workModu)
@@ -44,52 +41,60 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
         , (AttrByName "swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
         , (AttrByName "wscFd"          , EdhDecimal $ fromIntegral wscFd)
         ]
+        (edh'scope'entity moduScope)
       exit
 
-    void $ installEdhModule world "swarm/RT" $ \pgs exit -> do
+    void $ installEdhModule world "swarm/RT" $ \ !ets !exit ->
 
-      let moduScope = contextScope $ edh'context pgs
-          modu      = thisObject moduScope
+      -- loosely depend on the @net@ runtime from nedh project
+      runEdhTx ets $ importEdhModule "net/RT" $ \case
+        EdhObject !moduNetRT -> \_ets ->
+          lookupEdhObjAttr moduNetRT (AttrByName "Peer") >>= \case
+            (_, EdhObject !peerClass) -> do
 
-      moduArts <-
-        sequence
-          $ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-            | (mc, nm, hp, args) <-
-              [ ( EdhMethod
-                , "killWorker"
-                , killWorkerProc
-                , PackReceiver [mandatoryArg "pid"]
-                )
-              , ( EdhMethod
-                , "wscTake"
-                , wscTakeProc
-                , PackReceiver [mandatoryArg "wscFd", mandatoryArg "peerObj"]
-                )
-              , ( EdhMethod
-                , "waitAnyWorkerDone"
-                , waitAnyWorkerDoneProc
-                , PackReceiver []
-                )
-              , ( EdhMethod
-                , "wscStartWorker"
-                , wscStartWorkerProc
-                , PackReceiver
-                  [ mandatoryArg "wsAddr"
-                  , mandatoryArg "workDir"
-                  , mandatoryArg "executable"
-                  , mandatoryArg "workModu"
-                  ]
-                )
-              ]
-            ]
+              let !moduScope = contextScope $ edh'context ets
 
-      artsDict <- EdhDict
-        <$> createEdhDict [ (EdhString k, v) | (k, v) <- moduArts ]
-      updateEntityAttrs pgs (objEntity modu)
-        $  [ (AttrByName k, v) | (k, v) <- moduArts ]
-        ++ [(AttrByName "__exports__", artsDict)]
+              moduArts <-
+                sequence
+                  $ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
+                    | (mc, nm, hp, args) <-
+                      [ ( EdhMethod
+                        , "killWorker"
+                        , killWorkerProc
+                        , PackReceiver [mandatoryArg "pid"]
+                        )
+                      , ( EdhMethod
+                        , "wscTake"
+                        , wscTakeProc peerClass
+                        , PackReceiver [mandatoryArg "wscFd"]
+                        )
+                      , ( EdhMethod
+                        , "waitAnyWorkerDone"
+                        , waitAnyWorkerDoneProc
+                        , PackReceiver []
+                        )
+                      , ( EdhMethod
+                        , "wscStartWorker"
+                        , wscStartWorkerProc
+                        , PackReceiver
+                          [ mandatoryArg "wsAddr"
+                          , mandatoryArg "workDir"
+                          , mandatoryArg "executable"
+                          , mandatoryArg "workModu"
+                          ]
+                        )
+                      ]
+                    ]
 
-      exit
+              !artsDict <- EdhDict
+                <$> createEdhDict [ (EdhString k, v) | (k, v) <- moduArts ]
+              flip iopdUpdate (edh'scope'entity moduScope)
+                $  [ (AttrByName k, v) | (k, v) <- moduArts ]
+                ++ [(AttrByName "__exports__", artsDict)]
+
+              exit
+            _ -> error "bug: net/RT provides no Peer class"
+        _ -> error "bug: importEdhModule returned non-object"
 
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()

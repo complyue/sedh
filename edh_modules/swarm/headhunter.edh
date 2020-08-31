@@ -8,14 +8,10 @@ import * 'swarm/symbols'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case import (** _ ) 'swarm/ENV' of { senv } -> { pass }
+senv = { import (** _ ) 'swarm/ENV' }
 
 
 export class HeadHunter {
-
-  # fetch effective configurations, cache as instance attribute
-  priority = perform priority
-  headcount = perform headcount
 
   class Forager {
     hcEmployed = 0
@@ -47,86 +43,136 @@ export class HeadHunter {
     }
   }
 
-  hcEmployed = 0 # total heads employed by this HH
-
   # a swarm node connection identifying itself as a forager
-  method OfferHeads(
+  export method OfferHeads(
     foragerPid, maxHC,
   ) {
+    peer = perform @netPeer
+
     ai { # calculate number of employment atomically
       hcDemand = this.headcount - this.hcEmployed
       hcToEmploy = min( maxHC, hcDemand )
     }
     hcToEmploy < 1 -> { # no demand, disconnect
       # todo send zero employment ?
-      that.peer.stop()
+      peer.stop()
     }
 
     # employ heads from this forager
-    ai case this.foragers[ that.peer ] of {
+    ai case this.foragers[ peer ] of {
       nil -> {
         forager = Forager(
-          that.peer, foragerPid,
+          peer, foragerPid,
         )
-        this.foragers[ that.peer ] = forager
+        this.foragers[ peer ] = forager
       }
       { forager } -> { pass }
     }
     forager.hcEmployed += hcToEmploy
     console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
-    ++ that.peer.ident() ++ ' now.'
-    that.peer.p2c( dataChan, repr( forager.hcEmployed ) )
+    ++ peer.ident() ++ ' now.'
+    peer.p2c( dataChan, repr( forager.hcEmployed ) )
 
     return nil
   }
 
   # a swarm node connection identifying itself as a worker
-  method StartWorking(
+  export method StartWorking(
     workerPid, foragerPid,
   ) {
+    peer = perform @netPeer
+
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
-    ++ foragerPid ++ ' via ' ++ that.peer.ident() ++ ' start working.'
-    worker = Worker( that.peer, workerPid, foragerPid )
+    ++ foragerPid ++ ' via ' ++ peer.ident() ++ ' start working.'
+    worker = Worker( peer, workerPid, foragerPid )
     this.idleWorkers.push( worker )
     this.workerAvailable <- worker
     return nil
   }
 
-  case Server (
-    'swarm/headhunter', # the service module
-    perform swarmIface $=> '0.0.0.0', # local addr to bind
-    0, # local port to bind
-    # per-connection peer module initialization
-    init=method swarm'conn'init () {
-      that.OfferHeads = this.OfferHeads
-      that.StartWorking = this.StartWorking
-    },
-  ) of { server } -> {
-    case server.addrs() of {
-      { wsAddr =>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
-      # or the network has failed, propagate the error
-      server.join() # this usually throws
-      # in case join() didn't throw, report this error
-      error( 'HeadHunter failed listening.' )
+  method __init__( resultSink as this.resultSink ) {
+    # fetch effective configurations, cache as instance attribute
+    this.priority = perform priority
+    this.headcount = perform headcount
+
+    # total heads employed by this HH
+    this.hcEmployed = 0
+    # data structures for job scheduling
+    this.foragers = {}
+    this.workerAvailable = sink # signal on new worker available,
+    # but should obtain an available worker from idleWorkers with tx
+    this.idleWorkers = [] # FILO queue
+    this.pendingJobs = [] # FILO queue
+    this.pendingCntr = sink # increased/decreased on job submit/result/err
+    this.finishingUp = sink # signal of no more jobs, i.e. to start finishing up
+
+    go {
+      hh = this; # alias self
+      server = Server(
+        'swarm/headhunter', # the service module
+        perform swarmIface $=> '0.0.0.0', # local addr to bind
+        0, # local port to bind
+        init=method _ () { # per-connection peer module initialization
+          # note this/that are both the forager/worker facing module in this
+          # procedure
+          import * hh into that
+        },
+      )
+      case server.addrs() of {
+        { wsAddr =>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
+        # or the network has failed, propagate the error
+        server.join() # this usually throws
+        # in case join() didn't throw, report this error
+        error( 'HeadHunter failed listening.' )
+      }
+
+      # call-for-workers advertiser
+      cfw = Advertiser(
+        # target swarm address
+        perform swarmAddr $=> '127.0.0.1', perform swarmPort $=> 3722,
+        # announce call-for-workers from our worksource addr
+        fromAddr=wsAddr,
+      )
+
+      # advertise call-for-workers when there's demand
+      for _ from console.everySeconds(
+        perform cfwInterval $=> 3, # use effectful config
+        wait1st=false, # announce the first CFW immediately
+      ) do {
+        # check if all have finished
+        this.allFinished() -> { break }
+
+        # calibrate this.hcEmployed, wrt forager disconnection etc.
+        hcEmployed = 0
+        for ( peer, forager ) from this.foragers
+        do case peer.eol() of {
+          false -> hcEmployed += forager.hcEmployed
+          this.foragers[ peer ] = nil # forget about it
+        }
+        if this.hcEmployed != hcEmployed then {
+          console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
+          this.hcEmployed = hcEmployed
+        }
+
+        hcDemand = this.headcount - hcEmployed
+        if hcDemand > 0 then {
+          console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
+          ++ cfw.addrs()
+          cfw.post( expr
+
+            WorkToDo(
+              {$ hcDemand $},
+              {$ senv.jobExecutable $},
+              {$ senv.jobWorkDir $},
+              {$ senv.jobWorkModu $},
+              {$ this.priority $},
+            )
+
+          )
+        }
+      }
     }
   }
-
-  # call-for-workers advertiser
-  case Advertiser(
-    # target swarm address
-    perform swarmAddr $=> '127.0.0.1', perform swarmPort $=> 3722,
-    # announce call-for-workers from our worksource addr
-    fromAddr=wsAddr,
-  ) of { cfw } -> { pass }
-
-  # data structures for job scheduling
-  foragers = {}
-  workerAvailable = sink # signal on new worker available,
-  # but should obtain an available worker from idleWorkers with tx
-  idleWorkers = [] # FILO queue
-  pendingJobs = [] # FILO queue
-  pendingCntr = sink # increased/decreased on job submit/result/err
-  finishingUp = sink # signal of no more jobs, i.e. to start finishing up
 
   method allFinished() {
     eos( this.resultSink ) -> true
@@ -140,46 +186,6 @@ export class HeadHunter {
     }
 
     return false
-  }
-
-  method __init__( resultSink as this.resultSink ) go {
-    # advertise call-for-workers when there's demand
-    for _ from console.everySeconds(
-      perform cfwInterval $=> 3, # use effectful config
-      wait1st=false, # announce the first CFW immediately
-    ) do {
-      # check if all have finished
-      this.allFinished() -> { break }
-
-      # calibrate this.hcEmployed, wrt forager disconnection etc.
-      hcEmployed = 0
-      for ( peer, forager ) from this.foragers
-      do case peer.eol() of {
-        false -> hcEmployed += forager.hcEmployed
-        this.foragers[ peer ] = nil # forget about it
-      }
-      if this.hcEmployed != hcEmployed then {
-        console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
-        this.hcEmployed = hcEmployed
-      }
-
-      hcDemand = this.headcount - hcEmployed
-      if hcDemand > 0 then {
-        console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
-        ++ cfw.addrs()
-        cfw.post( expr
-
-          WorkToDo(
-            {$ hcDemand $},
-            {$ senv.jobExecutable $},
-            {$ senv.jobWorkDir $},
-            {$ senv.jobWorkModu $},
-            {$ this.priority $},
-          )
-
-        )
-      }
-    }
   }
 
   method trackJob( worker, ips ) {

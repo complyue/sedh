@@ -6,7 +6,7 @@ import * 'swarm/RT'
 # work definition scripts are allowed to change the inferred
 # configuration at 'swarm/ENV', import it as a namespace to
 # always use up-to-date artifacts living there
-case { import (** _ ) 'swarm/ENV' } of { senv } -> { pass }
+senv = { import (** _ ) 'swarm/ENV' }
 
 import * './wsq'
 
@@ -22,16 +22,23 @@ export class WSC {
     workDir as this.workDir,
     workModu as this.workModu,
     priority as this.priority,
-  ) pass
+  ) {
+    # headcount reserved for this worksource
+    this.hcReserved = 0
+    # headcount hired by the worksource, updated from the worksource,
+    # as its demands changed
+    this.hcEmployed = sink
 
-  # headcount reserved for this worksource
-  hcReserved = 0
-  # headcount hired by the worksource, updated from the worksource,
-  # as its demands changed
-  hcEmployed = sink
+    # all live worker processes by pid
+    this.workers = {}
 
-  # all live worker processes by pid
-  workers = {}
+    # stop signal for this wsc
+    this.stopped = sink
+
+    # ever increasing number to track reform bumps
+    this.reformNumber = sink
+    this.reformNumber <- 0 # initialize to 0
+  }
 
   method __repr__() {
     '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
@@ -44,21 +51,28 @@ export class WSC {
   method engage ( hcAvailable ) {
     this.hcReserved = min( hcAvailable, this.hcPlanned )
 
+    # artifacts should be implanted into the worksource facing, negotiator
+    # module
+    namespace nego'arts ( wsc = this ) export {
+      wsc = wsc # for it to be exported thus to be implanted with the name
+      import * wsc # re-export the exports
+    }
+
     {
+
       go {
-        method __init_nego__ () {
-          that.wsc = this
-        }
-        case Client(
-          this.forager.negoModu, this.addr, init=__init_nego__,
-        ) of { clnt } -> {
-          case clnt.addrs() of { addr =>_ } ->
-          console.debug<| 'Connected to worksource at: ' ++ addr
-          case clnt.eol() of {
-            false -> { pass }
-            clnt.join() # this normally throws
-            error( 'connection to worksource failed' )
-          }
+        clnt = Client(
+          this.forager.negoModu, this.addr,
+          init=method _ () {
+            import * nego'arts into that
+          },
+        )
+        case clnt.addrs() of { addr =>_ } ->
+        console.debug<| 'Connected to worksource at: ' ++ addr
+        case clnt.eol() of {
+          false -> { pass }
+          clnt.join() # this normally throws
+          error( 'connection to worksource failed' )
         }
 
         # stop this wsc anyway the network connection is disconnected
@@ -67,26 +81,20 @@ export class WSC {
 
       # register this wsc
       this.forager.wsd[ this.key() ] = this
+
     } $=> { exc } -> { # this catches exceptions occurred directly or
       # in forked threads
-      console.error<| 'Stopping team ' ++this++ ' on error: ' ++ exc
+      console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
       this.stop()
     }
 
     return this.hcReserved
   }
 
-  # stop signal for this wsc
-  stopped := sink
-
-  # ever increasing number to track reform bumps
-  reformNumber := sink
-  reformNumber <- 0 # initialize to 0
-
   # this method meant to be forked once per wsc
   method teamKeeper() {
     # terminate this thread on stop signal
-    perceive stopped { break }
+    perceive this.stopped { break }
 
     rfn = mre( this.reformNumber )
 
@@ -168,12 +176,17 @@ export class Forager {
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
     this.headcount >= 1 |> error( 'Invalid headcount: ' ++this.headcount )
-  }
 
-  # prioritized recent queue for backlog of worksources
-  wsq = PRQ()
-  # worksources currently being actively worked on
-  wsd = {}
+    # prioritized recent queue for backlog of worksources
+    this.wsq = PRQ()
+    # worksources currently being actively worked on
+    this.wsd = {}
+
+    # available headcounts to be offered
+    this.hcIdle = sink
+    # stream of `pid:wsc` for ever started worker processes
+    this.workerStarted = sink
+  }
 
   # A work source (e.g. a head hunter) should announce call-for-workers
   # in this format, and this intends to be exposed (imported) by a network
@@ -185,17 +198,20 @@ export class Forager {
     workModu, # work definition module
     priority = 0, # used to prioritize allocation of work heads
   ) {
-    case workModu of {
-      { that.targetPrefix >@ _ } -> { pass }
-      return nil # filtered out by prefix
-    }
+    # apply any filter in effect
+    # todo only filtering by work modu so far, elaborate in the future
+    if perform ignoreWorkModu( workModu ) then return nil
 
-    # `that.addr` is the worksource address we are supposed to connect,
-    # which is from the network facing module of a sniffer i.e. the forager
+    # we are supposed to connect to the source address of the announced
+    # call-for-workers (UDP packet), to comm with the announcing worksource
     #
+    # and the sniffer (initiated for this forager) should be providing the
+    # effectful `sourceAddr`
+    cfwAddr = perform sourceAddr
+
     # such addr objects are non-equal from eachother in object semantics,
     # even from the same advertiser, so we use its repr str as identifier
-    wsKey = repr( that.addr )
+    wsKey = repr( cfwAddr )
     ai {
       case this.wsd[ wsKey ] of {
         { _ } -> { pass } # already been worked on TODO update info ?
@@ -205,7 +221,7 @@ export class Forager {
             wsc.update( hcPlanned, executable, workDir, workModu, priority, )
           }
           this.wsq.enque( WSC (
-              forager=this, addr=that.addr,
+              forager=this, addr=cfwAddr,
               hcPlanned, executable, workDir, workModu, priority,
           ) )
         }
@@ -214,11 +230,6 @@ export class Forager {
 
     return nil
   }
-
-  # available headcounts to be offered
-  hcIdle = sink
-  # stream of `pid:wsc` for ever started worker processes
-  workerStarted = sink
 
   method scheduleTeams() {
 

@@ -8,17 +8,15 @@ import * 'swarm/symbols'
 import * 'swarm/compat'
 import * 'swarm/RT'
 
-# work definition scripts are allowed to change the inferred
-# configuration at 'swarm/ENV', import it as a namespace to
-# always use up-to-date artifacts living there
-case { import (** _ ) 'swarm/ENV' } of { senv } -> { pass }
+# work definition scripts are allowed to change the inferred configuration at
+# 'swarm/ENV', get & use the module reference so we always use up-to-date
+# artifacts living there
+senv = { import (** _ ) 'swarm/ENV' }
 
 
 # take the worksource connection file describer, make it a peer for comm
-# note `wscTake()` performs IO, so assign its return value won't work
-case wscTake( senv.wscFd, Peer() ) of { peer } -> {
-  console.debug<| 'Took worker connection to worksource: ' ++ peer
-}
+peer = wscTake( senv.wscFd )
+console.debug<| 'Took worker connection to worksource: ' ++ peer
 
 jobSink = peer.armChannel( dataChan )
 

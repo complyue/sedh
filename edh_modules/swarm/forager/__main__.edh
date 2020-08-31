@@ -10,23 +10,9 @@ import ( Addr, **_ ) 'net'
 import * './mgmt'
 
 
-# source address of the sniffed command packet, updated each
-# time a packet is sniffed and executed as command
-addr := Addr()
-
-
-# configured prefix to filter out uninteresting worksources
-# this is normally implanted by host module initialization
-targetPrefix ?:= ''
-
 # the managing forager instance
 # this is normally implanted by host module initialization
 forager ?:= Forager()
-
-
-# expose its reacting (exported) methods here, to be callable
-# by sniffed commands
-import * forager
 
 
 # start the forager's scheduling work
@@ -57,5 +43,5 @@ while eol() is false {
   }
 
 } $=> { exc } -> {
-  console.error<| 'Error sniffing: ' ++ exc
+  console.error<| 'Error sniffing: ' ++ desc( exc )
 }

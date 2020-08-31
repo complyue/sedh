@@ -12,16 +12,16 @@
  # are going to repeat yourself in duplicating works in such entry modules
  #}
 
+# specify the work module
 JOB_WORK_MODU = 'swarm/demo/batch'
 
 # work definition scripts are allowed to change the inferred configuration in
 # 'swarm/ENV', import it as a namespace here, to change it as appropriate
-case { import (** _ ) 'swarm/ENV' } of { senv } -> {
-  senv.jobWorkModu = JOB_WORK_MODU
+senv = { import (** _ ) 'swarm/ENV' }
+senv.jobWorkModu = JOB_WORK_MODU
 
-  # uncomment so modified code get re-compiled during job running
-  # senv.jobExecutable = ('cabal', 'run', 'gwd')
-}
+# uncomment so modified code get re-compiled during job running
+# senv.jobExecutable = ('cabal', 'run', 'gwd')
 
 # import reusable work definition from some module
 import * JOB_WORK_MODU

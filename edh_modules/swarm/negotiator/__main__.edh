@@ -16,28 +16,27 @@ import * 'swarm/forager/mgmt'
 
 # this should have been implanted by per-connection peer module initialization
 wsc ?:= WSC()
-# expose reacting procedures exported from the wsc object
-import * wsc
 
 
 # this should have been implanted by per-connection peer module preparation
 peer ?:= Peer()
 console.debug<| 'Swarm forager negotiating with worksource - ' ++ peer
 
-
 effect {
   ; @netPeer = peer
-  ; @dataSink = peer.armChannel( dataChan ?:= 'data' )
+  ; @dataSink = peer.armChannel( dataChan, wsc.hcEmployed )
 }
 
 
-producer _ ( outlet ) {
+# we'll identify ourself as a forager to the worksource, as soon as the WSC
+# is ready to receive employment confirmation events from the channel sink
+; ( outlet = wsc.hcEmployed ) | producer _ ( outlet ) {
   peer.postCommand( expr
 
     OfferHeads( {$ senv.swarmManagerPid $}, {$ wsc.hcReserved $} )
 
   )
-} $ ( outlet=peer.armChannel( dataChan, wsc.hcEmployed ) )
+}
 # start the team keeper, it'll subscribe to wsc.hcEmployed, thus to kick off
 # the producer above
 go wsc.teamKeeper()

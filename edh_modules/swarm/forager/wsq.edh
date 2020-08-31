@@ -40,16 +40,16 @@ export class PRQ {
     lingers as this.lingers = 5*60, # 5 minutes by default
     # the max number of records should be kept in queue
     backlog as this.backlog = 50, # 50 by default
-  ) pass
+  ) {
+    # mapping addr key to worksources those in queue
+    this.iqd = {}
+    # list of CRQs sorted by priority
+    this.pv = []
 
-  # mapping addr key to worksources those in queue
-  iqd = {}
-  # list of CRQs sorted by priority
-  pv = []
-
-  # queue change number, ever increasing as each new ws enqueued
-  qcn = sink
-  qcn <- 0 # initialize to 0
+    # queue change number, ever increasing as each new ws enqueued
+    this.qcn = sink
+    this.qcn <- 0 # initialize to 0
+  }
 
   generator streamOut() while true {
     ai {
@@ -133,9 +133,10 @@ class CRQ {
     # concurrency must be guaranteed by carefully manipulation of
     # rp/wp wrt STM semantics
     this.l = Vector( length=this.prq.backlog )
-  }
 
-  rp = -1 wp = 0
+    this.rp = -1
+    this.wp = 0
+  }
 
   method empty() this.rp < 0
 

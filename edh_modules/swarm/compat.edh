@@ -1,6 +1,8 @@
 
 export {
 
+  # an alternate apk constructor to interop with other dynamic languages (e.g.
+  # Python) those don't have the intrinsic syntax
   method ArgsPack(*** apk ) apk
 
 }

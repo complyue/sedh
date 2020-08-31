@@ -94,7 +94,7 @@ export class PRQ {
     while true case lower of {
       { r => rest'pv } -> case r of { ( p, crq ) } -> {
         # already has a crq for this priority
-        if priority == p then { return crq }
+        if priority == p then return crq
         # found the insert position for this priority
         if priority > p then {
           crq = CRQ( this )
@@ -151,7 +151,7 @@ class CRQ {
     if qfull then {
       let ( wsc', qt ) = this.l[ this.rp ]
       # queue full of lingering wsc
-      if qt > lingerThres then { return false }
+      if qt > lingerThres then return false
       # pushed out of queue
       this.prq.iqd[ wsc'.key() ] = nil
     }
@@ -170,7 +170,7 @@ class CRQ {
   # out and returned
   method deq() while true ai {
     # queue empty
-    if this.rp < 0 then { return nil }
+    if this.rp < 0 then return nil
     case this.l[ this.rp ] of {
       { ( wsc, _qt ) } -> this.l[ this.rp ] = nil
       # dirty read, this is possible as Vector is non-transactional container

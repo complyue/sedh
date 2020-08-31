@@ -258,7 +258,7 @@ export class Forager {
     hcCum = this.headcount nsLastIdle = 0
     # collect idle heads in a dedicated thread, to not miss any unleash
     go for hcNewIdle from this.hcIdle do {
-      if hcNewIdle < 1 then { continue }
+      if hcNewIdle < 1 then continue
       nsLastIdle = console.now()
       hcCum += hcNewIdle
     }

@@ -52,7 +52,7 @@ export method @doOneJob * {
   case computeIt( m * n ) of { r } -> { pass }
 
   # simulate computation time cost, each taking 3 seconds.
-  # for ts from console.everySeconds( 3 ) do { break }
+  # for ts from console.everySeconds( 3 ) do break
   # or no artificial delay
   ts = console.now()
 

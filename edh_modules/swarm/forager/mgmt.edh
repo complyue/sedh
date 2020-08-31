@@ -60,32 +60,35 @@ export class WSC {
 
     {
 
-      go {
+      go { # do the negotiation on a separate thread, don't block the forager
+        # from comm with other worksources concurrently
         clnt = Client(
           this.forager.negoModu, this.addr,
           init=method _ () {
             import * nego'arts into that
           },
         )
-        case clnt.addrs() of { addr =>_ } ->
-        console.debug<| 'Connected to worksource at: ' ++ addr
-        case clnt.eol() of {
-          false -> { pass }
-          clnt.join() # this normally throws
+        # note @.addrs()@ will wait until it's connected or failed
+        case clnt.addrs() of { addr =>_ }
+        -> console.debug<| 'Connected to worksource at: ' ++ addr
+        if clnt.eol() is not false then {
+          clnt.join() # this usually throws in this case
+          # still report an error if above line didn't throw
           error( 'connection to worksource failed' )
         }
 
-        # stop this wsc anyway the network connection is disconnected
+        # cleanup anyway the network connection is disconnected
         clnt.join() @=> this.stop()
       }
 
-      # register this wsc
+      # register this wsc to the forager
       this.forager.wsd[ this.key() ] = this
 
-    } $=> { exc } -> { # this catches exceptions occurred directly or
-      # in forked threads
+    } $=> { exc } -> { # this can catch exceptions occurred synchronously, or
+      # more probably in case here, on the forked negotiating thread
       console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
-      this.stop()
+
+      this.stop() # cleanup on any exception occurred
     }
 
     return this.hcReserved

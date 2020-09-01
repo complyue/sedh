@@ -9,8 +9,8 @@ import * 'swarm/compat'
 import * 'swarm/RT'
 
 # work definition scripts are allowed to change the inferred configuration at
-# 'swarm/ENV', get & use the module reference so we always use up-to-date
-# artifacts living there
+# 'swarm/ENV', import the module as a reference, to get/set effective artifacts
+# living there
 senv = { import (** _ ) 'swarm/ENV' }
 
 
@@ -26,10 +26,13 @@ effect {
 }
 
 
-# inherit the work module, so we have access to `@doOneJob` implemented there
-extends {
-  import (** _ ) senv.jobWorkModu
-}
+# in a worker process, @senv.jobWorkSpec@ is the work definition module
+workDefinition = senv.jobWorkSpec
+# import work related artifacts from there
+import (
+  @doOneJob,
+  **_ # it may export more stuff, that we ignore here
+) workDefinition
 
 
 # identify this connection as swarm worker to the headhunter, then it will
@@ -47,17 +50,18 @@ producer initiateJobs( outlet ) {
 go for ips from initiateJobs( outlet=jobSink ) do {
   console.debug<| 'Computing ips: ' ++ ips
 
-  case super.@doOneJob(** ips ) of {
+  case @doOneJob(** ips ) of {
     { result } -> {
       console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
       peer.p2c( dataChan, repr( result ) )
     }
+    # in case it returned nil
     throw UsageError( 'Swarm job returned no result', ips=ips )
   } $=> { jobExc } -> {
-    console.error<| 'Swarm job [' ++ senv.jobWorkModu ++ ' - '
+    console.error<| 'Swarm job [' ++ workDefinition ++ ' - '
     ++ senv.swarmManagerPid ++ '>' ++ senv.swarmWorkerPid ++ '] failure:\n'
     ++ jobExc
-    peer.p2c( errChan, repr( jobExc ) )
+    peer.p2c( errChan, desc( jobExc ) )
     break # stop processing more jobs
   }
 

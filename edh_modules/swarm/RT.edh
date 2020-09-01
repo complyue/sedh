@@ -8,7 +8,7 @@
  # Execution of this module file is a sign showing that wrong Edh
  # interpreter is used to run the program.
  #}
-error( 'Missing host module!', target=__name__ )
+error( 'Missing host module: ' ++ __name__ )
 
 # TODO mockups of procedures and other artifacts can be written in
 #      this source file, to give meaningful information to IDEs and/or

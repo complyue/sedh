@@ -27,7 +27,7 @@ import           Language.Edh.Swarm.Worker
 
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
-installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid workerPid wscFd) !world
+installSwarmBatteries (SwarmWorkStarter !executable !workDir !workSpec !managerPid !workerPid !wscFd) !world
   = do
 
     void $ installEdhModule world "swarm/ENV" $ \ !ets !exit -> do
@@ -36,7 +36,7 @@ installSwarmBatteries (SwarmWorkStarter executable workDir workModu managerPid w
       iopdUpdate
         [ (AttrByName "jobExecutable"  , EdhString executable)
         , (AttrByName "jobWorkDir"     , EdhString workDir)
-        , (AttrByName "jobWorkModu"    , EdhString workModu)
+        , (AttrByName "jobWorkSpec"    , EdhString workSpec)
         , (AttrByName "swarmManagerPid", EdhDecimal $ fromIntegral managerPid)
         , (AttrByName "swarmWorkerPid" , EdhDecimal $ fromIntegral workerPid)
         , (AttrByName "wscFd"          , EdhDecimal $ fromIntegral wscFd)
@@ -103,11 +103,11 @@ startSwarmWork !worldCustomization =
 
 startSwarmWork'
   :: (EdhConsole -> EdhWorld -> IO ()) -> (EdhWorld -> IO ()) -> IO ()
-startSwarmWork' !doRepl !worldCustomization = do
-  starter@(SwarmWorkStarter _executable _workDir workModu managerPid workerPid wscFd) <-
+startSwarmWork' !runRepl !worldCustomization = do
+  starter@(SwarmWorkStarter _executable _workDir !workSpec !managerPid !workerPid !wscFd) <-
     determineSwarmWorkStarter
 
-  console <- defaultEdhConsole defaultEdhConsoleSettings
+  !console <- defaultEdhConsole defaultEdhConsoleSettings
   let
     consoleOut      = writeTBQueue (consoleIO console) . ConsoleOut
     consoleShutdown = writeTBQueue (consoleIO console) ConsoleShutdown
@@ -129,10 +129,14 @@ startSwarmWork' !doRepl !worldCustomization = do
       -- call custom preparation
       worldCustomization world
 
-      if "" == workModu
-        then doRepl console world
-        else if wscFd == 0
-          then runEdhModule world (T.unpack workModu) edhModuleAsIs >>= \case
+      case workSpec of
+
+        -- run in repl mode
+        "" -> runRepl console world
+
+        -- run in headhunter mode
+        !workScript | wscFd == 0 ->
+          runEdhFile world (T.unpack workScript) >>= \case
             Left !err -> atomically $ do
               -- program crash on error
               consoleOut "Swarm headhunter crashed with an error:\n"
@@ -142,8 +146,8 @@ startSwarmWork' !doRepl !worldCustomization = do
               EdhNil ->
                 atomically
                   $  consoleOut
-                  $  "Swarm work "
-                  <> workModu
+                  $  "Swarm work script "
+                  <> workScript
                   <> " done right.\n"
               -- unclean program exit
               _ -> atomically $ do
@@ -151,20 +155,22 @@ startSwarmWork' !doRepl !worldCustomization = do
                 consoleOut $ (<> "\n") $ case phv of
                   EdhString msg -> msg
                   _             -> T.pack $ show phv
-          else runEdhModule world "swarm/worker" edhModuleAsIs >>= \case
-            Left !err -> atomically $ do
-              -- program crash on error
-              consoleOut "Swarm worker crashed with an error:\n"
-              consoleOut $ T.pack $ show err <> "\n"
-            Right !phv -> case edhUltimate phv of
-              -- clean program halt, all done
-              EdhNil -> atomically $ consoleOut "Swarm worker right retired.\n"
-              -- unclean program exit
-              _      -> atomically $ do
-                consoleOut "Swarm worker halted with a result:\n"
-                consoleOut $ (<> "\n") $ case phv of
-                  EdhString msg -> msg
-                  _             -> T.pack $ show phv
+
+        -- run in swarm worker mode
+        _workModu -> runEdhModule world "swarm/worker" edhModuleAsIs >>= \case
+          Left !err -> atomically $ do
+            -- program crash on error
+            consoleOut "Swarm worker crashed with an error:\n"
+            consoleOut $ T.pack $ show err <> "\n"
+          Right !phv -> case edhUltimate phv of
+            -- clean program halt, all done
+            EdhNil -> atomically $ consoleOut "Swarm worker right retired.\n"
+            -- unclean program exit
+            _      -> atomically $ do
+              consoleOut "Swarm worker halted with a result:\n"
+              consoleOut $ (<> "\n") $ case phv of
+                EdhString msg -> msg
+                _             -> T.pack $ show phv
 
       atomically consoleShutdown
 
@@ -176,18 +182,23 @@ startSwarmWork' !doRepl !worldCustomization = do
     -- shutdown console IO anyway
     atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
 
-  atomically $ if "" == workModu
-    then consoleOut ">> Get Work Done - by a swarm <<\n"
-    else if wscFd == 0
-      then
-        consoleOut
+  atomically $ case workSpec of
+
+    -- run in repl mode
+    "" -> consoleOut ">> Get Work Done - by a swarm <<\n"
+
+    -- run in headhunter mode
+    !workScript | wscFd == 0 ->
+      consoleOut
         $  ">> Hunting working heads for "
-        <> workModu
+        <> workScript
         <> " from swarm, HH pid="
         <> T.pack (show managerPid)
         <> " <<\n"
-      else
-        consoleOut
+
+    -- run in swarm worker mode
+    !workModu ->
+      consoleOut
         $  ">> Working out "
         <> workModu
         <> " for swarm by worker pid="
@@ -238,4 +249,4 @@ swarmRepl !console !world = do
               consoleOut "🐴🐴🐯🐯\n"
             doneRightOrRebirth
   doneRightOrRebirth
-  where consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
+  where !consoleOut = writeTBQueue (consoleIO console) . ConsoleOut

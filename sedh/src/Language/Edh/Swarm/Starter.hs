@@ -15,7 +15,7 @@ import qualified Data.Text                     as T
 data SwarmWorkStarter = SwarmWorkStarter {
       swarm'executable :: !Text
     , swarm'work'dir :: !Text
-    , swarm'work'module :: !Text
+    , swarm'work'spec :: !Text
     , swarm'manager'pid :: !Int
     , swarm'worker'pid :: !Int
     , swarm'wsc'fd :: !Int
@@ -28,31 +28,35 @@ determineSwarmWorkStarter = do
   !ppid     <- getParentProcessID
   !pid      <- getProcessID
   getArgs >>= \case
+
     -- no arg, will run as forager or repl
     [] -> return SwarmWorkStarter { swarm'executable  = T.pack execPath
                                   , swarm'work'dir    = T.pack pwd
-                                  , swarm'work'module = ""
+                                  , swarm'work'spec   = ""
                                   , swarm'manager'pid = fromIntegral pid
                                   , swarm'worker'pid  = 0
                                   , swarm'wsc'fd      = 0
                                   }
+
     -- single arg, will run as headhunter
-    [workModule] -> return SwarmWorkStarter
+    [!workScript] -> return SwarmWorkStarter
       { swarm'executable  = T.pack execPath
       , swarm'work'dir    = T.pack pwd
-      , swarm'work'module = T.pack workModule
+      , swarm'work'spec   = T.pack workScript
       , swarm'manager'pid = fromIntegral pid
       , swarm'worker'pid  = 0
       , swarm'wsc'fd      = 0
       }
+
     -- double args, will run as swarm worker
-    [workModule, wscFd] -> return SwarmWorkStarter
+    [!workModu, !wscFd] -> return SwarmWorkStarter
       { swarm'executable  = T.pack execPath
       , swarm'work'dir    = T.pack pwd
-      , swarm'work'module = T.pack workModule
+      , swarm'work'spec   = T.pack workModu
       , swarm'manager'pid = fromIntegral ppid
       , swarm'worker'pid  = fromIntegral pid
       , swarm'wsc'fd      = read wscFd
       }
+
     _ -> error "Invalid command line args"
 

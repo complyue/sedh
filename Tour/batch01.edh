@@ -12,18 +12,17 @@
  # are going to repeat yourself in duplicating works in such entry modules
  #}
 
-# specify the work module
-JOB_WORK_MODU = 'swarm/demo/batch'
+# import sedh support modules
+import * 'swarm'
 
-# work definition scripts are allowed to change the inferred configuration in
-# 'swarm/ENV', import it as a namespace here, to change it as appropriate
+# work definition scripts are allowed to change the inferred configuration at
+# 'swarm/ENV', import the module as a reference, to get/set effective artifacts
+# living there
 senv = { import (** _ ) 'swarm/ENV' }
-senv.jobWorkModu = JOB_WORK_MODU
 
-# uncomment so modified code get re-compiled during job running
-# senv.jobExecutable = ('cabal', 'run', 'gwd')
-
-# import reusable work definition from some module
+# we use this work definition module
+JOB_WORK_MODU = 'swarm/demo/batch'
+# pull in support artifacts exported from the work definition module
 import * JOB_WORK_MODU
 
 

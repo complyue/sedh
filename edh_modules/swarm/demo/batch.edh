@@ -81,6 +81,9 @@ export method @doOneJob * {
  #}
 export method manageThisWork * {
 
+  # the enclosing module here is the work definition module
+  effect @workDefinition = this.__name__
+
   # log and retry on job failure
   effect method @shouldRetryJob ( jobExc, ips ) {
     console.error<| 'Job failed: ' ++ jobExc

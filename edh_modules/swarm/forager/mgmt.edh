@@ -3,9 +3,9 @@ import * 'net'
 
 import * 'swarm/RT'
 
-# work definition scripts are allowed to change the inferred
-# configuration at 'swarm/ENV', import it as a namespace to
-# always use up-to-date artifacts living there
+# work definition scripts are allowed to change the inferred configuration at
+# 'swarm/ENV', import the module as a reference, to get/set effective artifacts
+# living there
 senv = { import (** _ ) 'swarm/ENV' }
 
 import * './wsq'
@@ -125,13 +125,12 @@ export class WSC {
       }
       # keep enough worker processes running
       while this.workers.size < hcEmployed {
-        case wscStartWorker(
+        wkrPid = wscStartWorker(
           this.addr,
           this.workDir, this.executable, this.workModu,
-        ) of { wkrPid } -> {
-          this.workers[ wkrPid ] = this
-          this.forager.workerStarted <- ( wkrPid, this )
-        }
+        )
+        this.workers[ wkrPid ] = this
+        this.forager.workerStarted <- ( wkrPid, this )
       }
     }
   }

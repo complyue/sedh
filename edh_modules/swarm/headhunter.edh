@@ -4,10 +4,9 @@ import * 'net'
 import * 'swarm/RT'
 import * 'swarm/symbols'
 
-
-# work definition scripts are allowed to change the inferred
-# configuration at 'swarm/ENV', import it as a namespace to
-# always use up-to-date artifacts living there
+# work definition scripts are allowed to change the inferred configuration at
+# 'swarm/ENV', import the module as a reference, to get/set effective artifacts
+# living there
 senv = { import (** _ ) 'swarm/ENV' }
 
 
@@ -92,6 +91,7 @@ export class HeadHunter {
 
   method __init__( resultSink as this.resultSink ) {
     # fetch effective configurations, cache as instance attribute
+    this.workModu = perform @workDefinition
     this.priority = perform priority
     this.headcount = perform headcount
 
@@ -164,7 +164,7 @@ export class HeadHunter {
               {$ hcDemand $},
               {$ senv.jobExecutable $},
               {$ senv.jobWorkDir $},
-              {$ senv.jobWorkModu $},
+              {$ this.workModu $},
               {$ this.priority $},
             )
 

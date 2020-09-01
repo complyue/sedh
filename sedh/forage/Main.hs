@@ -37,14 +37,14 @@ main = do
         runEdhModule world "forage" edhModuleAsIs >>= \case
           Left !err -> atomically $ do
             -- program crash on error
-            consoleOut "Edh swarm forager crashed with an error:\n"
+            consoleOut "Đ (Edh) swarm forager crashed with an error:\n"
             consoleOut $ T.pack $ show err <> "\n"
           Right !phv -> case edhUltimate phv of
             -- clean program halt, all done
             EdhNil -> return ()
             -- unclean program exit
             _      -> atomically $ do
-              consoleOut "Edh swarm forager halted with a result:\n"
+              consoleOut "Đ (Edh) swarm forager halted with a result:\n"
               consoleOut $ (<> "\n") $ case phv of
                 EdhString msg -> msg
                 _             -> T.pack $ show phv
@@ -57,6 +57,6 @@ main = do
     -- shutdown console IO anyway
     atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
 
-  atomically $ consoleOut ">> Edh Swarming Forager <<\n"
+  atomically $ consoleOut ">> Đ (Edh) Swarming Forager <<\n"
 
   consoleIOLoop console

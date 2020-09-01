@@ -91,9 +91,9 @@ export class HeadHunter {
 
   method __init__( resultSink as this.resultSink ) {
     # fetch effective configurations, cache as instance attribute
-    this.workModu = perform @workDefinition
     this.priority = perform priority
     this.headcount = perform headcount
+    this.workModu = perform @workDefinition
 
     # total heads employed by this HH
     this.hcEmployed = 0

@@ -1,6 +1,6 @@
 
 {#
- # this is an entry moduel to hook up some worker nodes from the swarm,
+ # this is an entry script to hook up some worker nodes from the swarm,
  # to accomplish the work defined in some module, with arbitrary overrides
  # possible from this module
 

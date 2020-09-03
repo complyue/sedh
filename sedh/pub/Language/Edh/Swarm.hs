@@ -185,7 +185,7 @@ startSwarmWork' !runRepl !worldCustomization = do
   atomically $ case workSpec of
 
     -- run in repl mode
-    "" -> consoleOut ">> Get Work Done - by a swarm <<\n"
+    "" -> return ()
 
     -- run in headhunter mode
     !workScript | wscFd == 0 ->
@@ -214,6 +214,7 @@ startSwarmWork' !runRepl !worldCustomization = do
 swarmRepl :: EdhConsole -> EdhWorld -> IO ()
 swarmRepl !console !world = do
   atomically $ do
+    consoleOut ">> Get Work Done - by a swarm <<\n"
     consoleOut
       "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
     consoleOut "  https://github.com/e-wrks/sedh/tree/master/Tour\n"

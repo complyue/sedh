@@ -37,6 +37,7 @@ library
     OverloadedStrings
     ScopedTypeVariables
     TupleSections
+    TypeApplications
     TypeOperators
     ViewPatterns
 
@@ -80,6 +81,7 @@ executable gwd
     OverloadedStrings
     ScopedTypeVariables
     TupleSections
+    TypeApplications
     TypeOperators
     ViewPatterns
 
@@ -114,6 +116,7 @@ executable forage
     OverloadedStrings
     ScopedTypeVariables
     TupleSections
+    TypeApplications
     TypeOperators
     ViewPatterns
 
@@ -150,6 +153,7 @@ library sedh-internal
     OverloadedStrings
     ScopedTypeVariables
     TupleSections
+    TypeApplications
     TypeOperators
     ViewPatterns
 

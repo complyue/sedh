@@ -54,34 +54,22 @@ installSwarmBatteries (SwarmWorkStarter !executable !workDir !workSpec !managerP
 
               let !moduScope = contextScope $ edh'context ets
 
-              moduArts <-
+              !moduArts <-
                 sequence
-                  $ [ (nm, ) <$> mkHostProc moduScope mc nm hp args
-                    | (mc, nm, hp, args) <-
-                      [ ( EdhMethod
-                        , "killWorker"
-                        , killWorkerProc
-                        , PackReceiver [mandatoryArg "pid"]
+                  $ [ (nm, ) <$> mkHostProc moduScope mc nm hp
+                    | (nm, mc, hp) <-
+                      [ ("killWorker", EdhMethod, wrapHostProc killWorkerProc)
+                      , ( "wscTake"
+                        , EdhMethod
+                        , wrapHostProc $ wscTakeProc peerClass
                         )
-                      , ( EdhMethod
-                        , "wscTake"
-                        , wscTakeProc peerClass
-                        , PackReceiver [mandatoryArg "wscFd"]
+                      , ( "waitAnyWorkerDone"
+                        , EdhMethod
+                        , wrapHostProc waitAnyWorkerDoneProc
                         )
-                      , ( EdhMethod
-                        , "waitAnyWorkerDone"
-                        , waitAnyWorkerDoneProc
-                        , PackReceiver []
-                        )
-                      , ( EdhMethod
-                        , "wscStartWorker"
-                        , wscStartWorkerProc
-                        , PackReceiver
-                          [ mandatoryArg "wsAddr"
-                          , mandatoryArg "workDir"
-                          , mandatoryArg "executable"
-                          , mandatoryArg "workModu"
-                          ]
+                      , ( "wscStartWorker"
+                        , EdhMethod
+                        , wrapHostProc wscStartWorkerProc
                         )
                       ]
                     ]
@@ -117,7 +105,7 @@ startSwarmWork' !runRepl !worldCustomization = do
 
       -- create the world, we always work with this world no matter how
       -- many times the Edh programs crash
-      world <- createEdhWorld console
+      !world <- createEdhWorld console
       installEdhBatteries world
 
       -- install batteries provided by nedh

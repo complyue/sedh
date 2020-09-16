@@ -20,13 +20,12 @@ import           Network.Socket.ByteString      ( recv
                                                 , sendAll
                                                 )
 
-import qualified Data.Lossless.Decimal         as D
 import           Language.Edh.EHI
 import           Language.Edh.Net
 
 
 waitAnyWorkerDoneProc :: EdhHostProc
-waitAnyWorkerDoneProc _ !exit !ets = if edh'in'tx ets
+waitAnyWorkerDoneProc !exit !ets = if edh'in'tx ets
   then throwEdh ets UsageError "you don't wait within a transaction"
   else
     runEdhTx ets $ edhContIO $ waitAnyWorker >>= atomically . exitEdh ets exit
@@ -61,10 +60,14 @@ waitAnyWorkerDoneProc _ !exit !ets = if edh'in'tx ets
           <> show sig
 
 
-wscStartWorkerProc :: EdhHostProc
-wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExecutable, EdhString !workModu] !kwargs) !exit
-  | odNull kwargs
-  = \ !ets -> if edh'in'tx ets
+wscStartWorkerProc
+  :: "wsAddr" !: Object
+  -> "workDir" !: Text
+  -> "jobExecutable" !: EdhValue
+  -> "workModu" !: Text
+  -> EdhHostProc
+wscStartWorkerProc (mandatoryArg -> !wsAddrObj) (mandatoryArg -> !workDir) (mandatoryArg  -> !jobExecutable) (mandatoryArg -> workModu) !exit !ets
+  = if edh'in'tx ets
     then throwEdh ets UsageError "you don't start worker within a transaction"
     else prepCmdl ets $ \ !wkrCmdl ->
       serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
@@ -112,16 +115,13 @@ wscStartWorkerProc (ArgsPack [EdhObject !wsAddrObj, EdhString !workDir, !jobExec
     EdhArgsPack (ArgsPack !vs _) -> strSeq ets vs [] exit'
     EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq ets vs [] exit'
     _ -> throwEdh ets UsageError "invalid jobExecutable"
-wscStartWorkerProc _ _ = throwEdhTx UsageError "invalid args"
 
 
-killWorkerProc :: EdhHostProc
-killWorkerProc (ArgsPack [EdhDecimal !wkrPid] !kwargs) !exit | odNull kwargs =
-  case D.decimalToInteger wkrPid of
-    Nothing   -> throwEdhTx UsageError $ "invalid pid: " <> T.pack (show wkrPid)
-    Just !pid -> \ !ets -> runEdhTx ets $ edhContIO $ do
-      confirmKill $ fromIntegral pid
-      atomically $ exitEdh ets exit nil
+killWorkerProc :: "workerPid" !: Int -> EdhHostProc
+killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
+  runEdhTx ets $ edhContIO $ do
+    confirmKill $ fromIntegral wkrPid
+    atomically $ exitEdh ets exit nil
  where
   confirmKill :: ProcessID -> IO ()
   -- assuming failure means the process by this pid doesn't exist (anymore)
@@ -132,36 +132,30 @@ killWorkerProc (ArgsPack [EdhDecimal !wkrPid] !kwargs) !exit | odNull kwargs =
     signalProcess nullSignal pid
     threadDelay 3000000  -- wait 3 seconds before try another round
     confirmKill pid
-killWorkerProc _ _ = throwEdhTx UsageError "invalid args"
 
 
-wscTakeProc :: Object -> EdhHostProc
-wscTakeProc !peerClass (ArgsPack [EdhDecimal !wscFd] !kwargs) !exit
-  | odNull kwargs = \ !ets -> case D.decimalToInteger wscFd of
-    Nothing -> throwEdh ets UsageError $ "bad wsc fd: " <> T.pack (show wscFd)
-    Just !wscFdInt -> do
-      let !peerId = "<wsc#" <> T.pack (show wscFdInt) <> ">"
-      !pktSink <- newEmptyTMVar
-      !poq     <- newEmptyTMVar
-      !chdVar  <- newTVar mempty
-      !wkrEoL  <- newEmptyTMVar
-      let !peer = Peer { edh'peer'ident    = peerId
-                       , edh'peer'eol      = wkrEoL
-                       , edh'peer'posting  = putTMVar poq
-                       , edh'peer'hosting  = takeTMVar pktSink
-                       , edh'peer'channels = chdVar
-                       }
-      !peerObj <- edhCreateHostObj peerClass (toDyn peer) []
+wscTakeProc :: Object -> "wscFd" !: Int -> EdhHostProc
+wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets = do
+  let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
+  !pktSink <- newEmptyTMVar
+  !poq     <- newEmptyTMVar
+  !chdVar  <- newTVar mempty
+  !wkrEoL  <- newEmptyTMVar
+  let !peer = Peer { edh'peer'ident    = peerId
+                   , edh'peer'eol      = wkrEoL
+                   , edh'peer'posting  = putTMVar poq
+                   , edh'peer'hosting  = takeTMVar pktSink
+                   , edh'peer'channels = chdVar
+                   }
+  !peerObj <- edhCreateHostObj peerClass (toDyn peer) []
 
-      runEdhTx ets $ edhContIO $ do
-        void
-          $ forkFinally
-              (workerThread (fromInteger wscFdInt) peerId pktSink poq wkrEoL)
-          $ atomically
-          . void
-          . tryPutTMVar wkrEoL
-        atomically $ exitEdh ets exit $ EdhObject peerObj
-wscTakeProc _ _ _ = throwEdhTx UsageError "invalid args"
+  runEdhTx ets $ edhContIO $ do
+    void
+      $ forkFinally (workerThread wscFd peerId pktSink poq wkrEoL)
+      $ atomically
+      . void
+      . tryPutTMVar wkrEoL
+    atomically $ exitEdh ets exit $ EdhObject peerObj
 
 
 workerThread

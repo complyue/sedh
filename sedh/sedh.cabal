@@ -25,8 +25,21 @@ library
         Language.Edh.Swarm
     hs-source-dirs: pub
     default-language: Haskell2010
-    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
-                        BangPatterns TupleSections ScopedTypeVariables
+    default-extensions:
+        NoImplicitPrelude
+        BangPatterns
+        ConstraintKinds
+        DataKinds
+        FlexibleContexts
+        FlexibleInstances
+        GADTs
+        KindSignatures
+        LambdaCase
+        OverloadedStrings
+        ScopedTypeVariables
+        TupleSections
+        TypeOperators
+        ViewPatterns
     ghc-options: -Wall
     build-depends:
         sedh-internal -any,
@@ -54,8 +67,21 @@ executable gwd
     hs-source-dirs: gwd
     other-modules:
     default-language: Haskell2010
-    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
-                        BangPatterns TupleSections ScopedTypeVariables
+    default-extensions:
+        NoImplicitPrelude
+        BangPatterns
+        ConstraintKinds
+        DataKinds
+        FlexibleContexts
+        FlexibleInstances
+        GADTs
+        KindSignatures
+        LambdaCase
+        OverloadedStrings
+        ScopedTypeVariables
+        TupleSections
+        TypeOperators
+        ViewPatterns
     ghc-options: -Wall -threaded "-with-rtsopts=-maxN31 -qg -I0"
     build-depends:
         sedh -any,
@@ -74,8 +100,21 @@ executable forage
     hs-source-dirs: forage
     other-modules:
     default-language: Haskell2010
-    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
-                        BangPatterns TupleSections ScopedTypeVariables
+    default-extensions:
+        NoImplicitPrelude
+        BangPatterns
+        ConstraintKinds
+        DataKinds
+        FlexibleContexts
+        FlexibleInstances
+        GADTs
+        KindSignatures
+        LambdaCase
+        OverloadedStrings
+        ScopedTypeVariables
+        TupleSections
+        TypeOperators
+        ViewPatterns
     ghc-options: -Wall -threaded -rtsopts "-with-rtsopts=-maxN2 -qg"
     build-depends:
         sedh -any,
@@ -95,8 +134,21 @@ library sedh-internal
         Language.Edh.Swarm.Worker
     hs-source-dirs: src
     default-language: Haskell2010
-    default-extensions: NoImplicitPrelude OverloadedStrings LambdaCase
-                        BangPatterns TupleSections ScopedTypeVariables
+    default-extensions:
+        NoImplicitPrelude
+        BangPatterns
+        ConstraintKinds
+        DataKinds
+        FlexibleContexts
+        FlexibleInstances
+        GADTs
+        KindSignatures
+        LambdaCase
+        OverloadedStrings
+        ScopedTypeVariables
+        TupleSections
+        TypeOperators
+        ViewPatterns
     ghc-options: -Wall
     build-depends:
         nedh -any,

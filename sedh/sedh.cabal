@@ -1,172 +1,176 @@
-cabal-version: 2.4
-name: sedh
-version: 0.1.0.0
-license: BSD-3-Clause
-copyright: Compl Yue
-maintainer: compl.yue@icloud.com
-author: Compl Yue
-stability: experimental
-homepage: https://github.com/e-wrks/sedh
-bug-reports: https://github.com/e-wrks/sedh/issues
-synopsis: Swarming Edh
+cabal-version:      2.4
+name:               sedh
+version:            0.1.0.0
+license:            BSD-3-Clause
+copyright:          Compl Yue
+maintainer:         compl.yue@icloud.com
+author:             Compl Yue
+stability:          experimental
+homepage:           https://github.com/e-wrks/sedh
+bug-reports:        https://github.com/e-wrks/sedh/issues
+synopsis:           Swarming Edh
 description:
-    Please see the README on Github at <https://github.com/e-wrks/sedh>
-category: Distributed,Network,Cluster
-build-type: Simple
-extra-source-files:
-    README.md
+  Please see the README on Github at <https://github.com/e-wrks/sedh>
+
+category:           Distributed,Network,Cluster
+build-type:         Simple
+extra-source-files: README.md
 
 source-repository head
-    type: git
-    location: https://github.com/e-wrks/sedh
+  type:     git
+  location: https://github.com/e-wrks/sedh
 
 library
-    exposed-modules:
-        Language.Edh.Swarm
-    hs-source-dirs: pub
-    default-language: Haskell2010
-    default-extensions:
-        NoImplicitPrelude
-        BangPatterns
-        ConstraintKinds
-        DataKinds
-        FlexibleContexts
-        FlexibleInstances
-        GADTs
-        KindSignatures
-        LambdaCase
-        OverloadedStrings
-        ScopedTypeVariables
-        TupleSections
-        TypeOperators
-        ViewPatterns
-    ghc-options: -Wall
-    build-depends:
-        sedh-internal -any,
-        nedh -any,
-        edh -any,
-        lossless-decimal -any,
-        network >=3.1.1.1,
-        base >=4.12,
-        stm >=2.5,
-        scientific -any,
-        binary -any,
-        hashable -any,
-        unordered-containers -any,
-        containers -any,
-        unix -any,
-        time -any,
-        clock -any,
-        text -any,
-        bytestring -any,
-        mtl -any,
-        transformers -any
+  exposed-modules:    Language.Edh.Swarm
+  hs-source-dirs:     pub
+  default-language:   Haskell2010
+  default-extensions:
+    NoImplicitPrelude
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    KindSignatures
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:        -Wall
+  build-depends:
+    , base                  >=4.12
+    , binary
+    , bytestring
+    , clock
+    , containers
+    , edh
+    , hashable
+    , lossless-decimal
+    , mtl
+    , nedh
+    , network               >=3.1.1.1
+    , scientific
+    , sedh-internal
+    , stm                   >=2.5
+    , text
+    , time
+    , transformers
+    , unix
+    , unordered-containers
 
 executable gwd
-    main-is: Main.hs
-    hs-source-dirs: gwd
-    other-modules:
-    default-language: Haskell2010
-    default-extensions:
-        NoImplicitPrelude
-        BangPatterns
-        ConstraintKinds
-        DataKinds
-        FlexibleContexts
-        FlexibleInstances
-        GADTs
-        KindSignatures
-        LambdaCase
-        OverloadedStrings
-        ScopedTypeVariables
-        TupleSections
-        TypeOperators
-        ViewPatterns
-    ghc-options: -Wall -threaded "-with-rtsopts=-maxN31 -qg -I0"
-    build-depends:
-        sedh -any,
-        nedh -any,
-        edh -any,
-        lossless-decimal -any,
-        base >=4.12,
-        stm >=2.5,
-        text -any,
-        bytestring -any,
-        mtl -any,
-        transformers -any
+  main-is:            Main.hs
+  hs-source-dirs:     gwd
+  other-modules:
+  default-language:   Haskell2010
+  default-extensions:
+    NoImplicitPrelude
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    KindSignatures
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:        -Wall -threaded "-with-rtsopts=-maxN31 -qg -I0"
+  build-depends:
+    , base              >=4.12
+    , bytestring
+    , edh
+    , lossless-decimal
+    , mtl
+    , nedh
+    , sedh
+    , stm               >=2.5
+    , text
+    , transformers
 
 executable forage
-    main-is: Main.hs
-    hs-source-dirs: forage
-    other-modules:
-    default-language: Haskell2010
-    default-extensions:
-        NoImplicitPrelude
-        BangPatterns
-        ConstraintKinds
-        DataKinds
-        FlexibleContexts
-        FlexibleInstances
-        GADTs
-        KindSignatures
-        LambdaCase
-        OverloadedStrings
-        ScopedTypeVariables
-        TupleSections
-        TypeOperators
-        ViewPatterns
-    ghc-options: -Wall -threaded -rtsopts "-with-rtsopts=-maxN2 -qg"
-    build-depends:
-        sedh -any,
-        nedh -any,
-        edh -any,
-        lossless-decimal -any,
-        base >=4.12,
-        stm >=2.5,
-        text -any,
-        bytestring -any,
-        mtl -any,
-        transformers -any
+  main-is:            Main.hs
+  hs-source-dirs:     forage
+  other-modules:
+  default-language:   Haskell2010
+  default-extensions:
+    NoImplicitPrelude
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    KindSignatures
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:        -Wall -threaded -rtsopts "-with-rtsopts=-maxN2 -qg"
+  build-depends:
+    , base              >=4.12
+    , bytestring
+    , edh
+    , lossless-decimal
+    , mtl
+    , nedh
+    , sedh
+    , stm               >=2.5
+    , text
+    , transformers
 
 library sedh-internal
-    exposed-modules:
-        Language.Edh.Swarm.Starter
-        Language.Edh.Swarm.Worker
-    hs-source-dirs: src
-    default-language: Haskell2010
-    default-extensions:
-        NoImplicitPrelude
-        BangPatterns
-        ConstraintKinds
-        DataKinds
-        FlexibleContexts
-        FlexibleInstances
-        GADTs
-        KindSignatures
-        LambdaCase
-        OverloadedStrings
-        ScopedTypeVariables
-        TupleSections
-        TypeOperators
-        ViewPatterns
-    ghc-options: -Wall
-    build-depends:
-        nedh -any,
-        edh -any,
-        lossless-decimal -any,
-        base >=4.12,
-        stm >=2.5,
-        scientific -any,
-        network -any,
-        binary -any,
-        hashable -any,
-        unordered-containers -any,
-        containers -any,
-        unix -any,
-        directory -any,
-        time -any,
-        clock -any,
-        text -any,
-        bytestring -any,
-        mtl -any,
-        transformers -any
+  exposed-modules:
+    Language.Edh.Swarm.Starter
+    Language.Edh.Swarm.Worker
+
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+  default-extensions:
+    NoImplicitPrelude
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    KindSignatures
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:        -Wall
+  build-depends:
+    , base                  >=4.12
+    , binary
+    , bytestring
+    , clock
+    , containers
+    , directory
+    , edh
+    , hashable
+    , lossless-decimal
+    , mtl
+    , nedh
+    , network
+    , scientific
+    , stm                   >=2.5
+    , text
+    , time
+    , transformers
+    , unix
+    , unordered-containers

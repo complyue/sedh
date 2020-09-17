@@ -17,13 +17,13 @@ while true { # this is the *Loop* in so-called REPL
 } $=> { # catch exceptions
 
   { { IOError:exc } } -> {
-    console.fatal <| 'IO error - ' ++ exc
+    console.fatal<| 'IO error - ' ++ exc
     rethrow # escalate it to the program loop of the
     # host interpreter, let it decide what to do.
   }
 
   { cmdExc } -> {
-    console.print( 'Recovered from error', exception=cmdExc )
+    console.error<| 'Recovered from error: ' ++ desc( cmdExc )
   }
 
 }

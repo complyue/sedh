@@ -69,7 +69,7 @@ wscStartWorkerProc
 wscStartWorkerProc (mandatoryArg -> !wsAddrObj) (mandatoryArg -> !workDir) (mandatoryArg  -> !jobExecutable) (mandatoryArg -> workModu) !exit !ets
   = if edh'in'tx ets
     then throwEdh ets UsageError "you don't start worker within a transaction"
-    else prepCmdl ets $ \ !wkrCmdl ->
+    else prepCmdl $ \ !wkrCmdl ->
       serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
         runEdhTx ets $ edhContIO $ do
           let
@@ -98,22 +98,17 @@ wscStartWorkerProc (mandatoryArg -> !wsAddrObj) (mandatoryArg -> !workDir) (mand
                   atomically $ exitEdh ets exit $ EdhDecimal $ fromIntegral
                     wkrPid
  where
-  strSeq
-    :: EdhThreadState
-    -> [EdhValue]
-    -> [String]
-    -> ([String] -> STM ())
-    -> STM ()
-  strSeq _   []       !sl exit' = exit' $ reverse sl
-  strSeq ets (v : vs) !sl exit' = case edhUltimate v of
-    EdhString !s -> strSeq ets vs (T.unpack s : sl) exit'
+  strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
+  strSeq []       !sl exit' = exit' $ reverse sl
+  strSeq (v : vs) !sl exit' = case edhUltimate v of
+    EdhString !s -> strSeq vs (T.unpack s : sl) exit'
     _ -> throwEdh ets UsageError $ "In exec cmdl, not a string: " <> T.pack
       (show v)
-  prepCmdl :: EdhThreadState -> ([String] -> STM ()) -> STM ()
-  prepCmdl !ets !exit' = case jobExecutable of
-    EdhString !executable -> exit' [T.unpack executable]
-    EdhArgsPack (ArgsPack !vs _) -> strSeq ets vs [] exit'
-    EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq ets vs [] exit'
+  prepCmdl :: ([String] -> STM ()) -> STM ()
+  prepCmdl !exit' = case jobExecutable of
+    EdhString   !executable        -> exit' [T.unpack executable]
+    EdhArgsPack (ArgsPack !vs _  ) -> strSeq vs [] exit'
+    EdhList     (List     _   !lv) -> readTVar lv >>= \vs -> strSeq vs [] exit'
     _ -> throwEdh ets UsageError "invalid jobExecutable"
 
 

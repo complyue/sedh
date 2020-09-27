@@ -38,7 +38,7 @@ export class HeadHunter {
     }
 
     method __repr__() {
-      '<Worker pid=' ++ this.pid ++ ' via ' ++ this.peer.ident() ++ '>'
+      '<Worker pid=' ++ this.pid ++ ' via ' ++ this.peer.ident ++ '>'
     }
   }
 
@@ -69,7 +69,7 @@ export class HeadHunter {
     }
     forager.hcEmployed += hcToEmploy
     console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
-    ++ peer.ident() ++ ' now.'
+    ++ peer.ident ++ ' now.'
     peer.p2c( dataChan, repr( forager.hcEmployed ) )
 
     return nil
@@ -82,7 +82,7 @@ export class HeadHunter {
     peer = perform @netPeer
 
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
-    ++ foragerPid ++ ' via ' ++ peer.ident() ++ ' start working.'
+    ++ foragerPid ++ ' via ' ++ peer.ident ++ ' start working.'
     worker = Worker( peer, workerPid, foragerPid )
     this.idleWorkers.push( worker )
     this.workerAvailable <- worker

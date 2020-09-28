@@ -1,9 +1,13 @@
 from typing import *
 import asyncio
 
-from hastalk import *
+from edh import *
+from nedh import *
+from sedh import *
 
-logger = get_logger(__package__)
+import sedh
+
+logger = sedh.log.get_logger(__package__)
 
 
 # a Peer object should have been implanted automatically, the following
@@ -45,9 +49,9 @@ asyncio.create_task(peer_err_intake(peer.ensure_channel(ERR_CHAN)))
 
 
 async def _run_():
-    import hastalk.nedh.effects
+    import nedh.effects
 
-    effect_import(hastalk.nedh.effects)
+    effect_import(nedh.effects)
 
     effect(
         {netPeer: peer, dataSink: peer.ensure_channel(DATA_CHAN),}

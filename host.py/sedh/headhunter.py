@@ -10,9 +10,9 @@ from . import log
 from .symbols import *
 
 # work definition scripts are allowed to change the inferred
-# configuration at `hastalk.sedh.senv`, import it as a namespace to
+# configuration at `sedh.senv`, import it as a namespace to
 # always use up-to-date artifacts living there
-import hastalk.sedh.senv as senv
+import sedh.senv as senv
 
 logger = log.get_logger(__name__)
 
@@ -72,7 +72,7 @@ class HeadHunter:
     """
 
     def __init__(
-        self, result_sink: EventSink, server_modu: str = "hastalk.sedh.hh",
+        self, result_sink: EventSink, server_modu: str = "sedh.hh",
     ):
         loop = asyncio.get_running_loop()
 

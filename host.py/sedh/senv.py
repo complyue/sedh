@@ -10,7 +10,7 @@ import os, sys
 jobExectuable = [
     sys.executable,
     "-m",
-    "hastalk.gwd",
+    "sedh.gwd",
 ]
 
 # default to use current working directory

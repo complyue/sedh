@@ -119,7 +119,7 @@ export class HeadHunter {
         },
       )
       case server.addrs() of {
-        { wsAddr =>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
+        { wsAddr :>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
         # or the network has failed, propagate the error
         server.join() # this usually throws
         # in case join() didn't throw, report this error

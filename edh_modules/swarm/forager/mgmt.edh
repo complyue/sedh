@@ -69,7 +69,7 @@ export class WSC {
           },
         )
         # note @.addrs()@ will wait until it's connected or failed
-        case clnt.addrs() of { addr =>_ }
+        case clnt.addrs() of { addr :>_ }
         -> console.debug<| 'Connected to worksource at: ' ++ addr
         if clnt.eol() is not false then {
           clnt.join() # this usually throws in this case

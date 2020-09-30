@@ -54,7 +54,7 @@ export class PRQ {
   generator streamOut() while true {
     ai {
       case this.pv of {
-        { pcrq => rest'pv } -> case pcrq of { ( _priority, crq ) }
+        { pcrq :> rest'pv } -> case pcrq of { ( _priority, crq ) }
         -> case crq.deq() of {
           { wsc } -> if crq.empty() then {
             # no more record at this priority
@@ -92,22 +92,22 @@ export class PRQ {
     higher = []
     lower = this.pv
     while true case lower of {
-      { r => rest'pv } -> case r of { ( p, crq ) } -> {
+      { r :> rest'pv } -> case r of { ( p, crq ) } -> {
         # already has a crq for this priority
         if priority == p then return crq
         # found the insert position for this priority
         if priority > p then {
           crq = CRQ( this )
-          this.pv = higher >> ( ( priority, crq ) => lower )
+          this.pv = higher >> ( ( priority, crq ) :> lower )
           return crq
         }
         # priority is lower
-        r => higher
+        r :> higher
         lower = rest'pv
       }
       # create a crq with lowest priority
       crq = CRQ( this )
-      this.pv = higher >> ( ( priority, crq ) => lower )
+      this.pv = higher >> ( ( priority, crq ) :> lower )
       return crq
     }
   }

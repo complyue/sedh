@@ -54,7 +54,7 @@ export method forageOn (
   )
 
   case sniffer.addrs() of {
-    { addr =>_ } -> console.info<| 'Foraging at: ' ++ addr
+    { addr :>_ } -> console.info<| 'Foraging at: ' ++ addr
     # or the network has failed, propagate the error
     sniffer.join() # this usually throws
     # in case join() didn't throw, report this error

@@ -64,8 +64,8 @@ export class WSC {
         # from comm with other worksources concurrently
         clnt = Client(
           this.forager.negoModu, this.addr,
-          init=method _ () {
-            import * nego'arts into that
+          init= modu => {
+            import * nego'arts into modu
           },
         )
         # note @.addrs()@ will wait until it's connected or failed

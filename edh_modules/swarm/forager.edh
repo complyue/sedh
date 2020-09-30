@@ -45,11 +45,11 @@ export method forageOn (
     # addr/port to sniff on
     swarmAddr, swarmPort,
     # sniffer module initializer
-    init = method _ () {
+    init= modu => {
       # implant the forager instance ets.
-      import * cfw'arts into that
+      import * cfw'arts into modu
       # provide effects like filtering etc.
-      effect import * cfw'effs into that
+      effect import * cfw'effs into modu
     },
   )
 

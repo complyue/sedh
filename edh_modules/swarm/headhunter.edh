@@ -112,10 +112,8 @@ export class HeadHunter {
         'swarm/headhunter', # the service module
         perform swarmIface $=> '0.0.0.0', # local addr to bind
         0, # local port to bind
-        init=method _ () { # per-connection peer module initialization
-          # note this/that are both the forager/worker facing module in this
-          # procedure
-          import * hh into that
+        init= modu => { # per-connection peer module initialization
+          import * hh into modu
         },
       )
       case server.addrs() of {

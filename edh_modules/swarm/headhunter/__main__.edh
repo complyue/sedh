@@ -8,7 +8,7 @@ import * 'net/symbols'
 effect import * 'net/effects'
 
 
-peer ?:= Peer()
+peer ?= Peer()
 console.debug<| 'Swarm forager/worker connected - ' ++ peer
 
 

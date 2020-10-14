@@ -42,7 +42,7 @@ export class WSC {
 
   method __repr__() {
     '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
-    ++ mre( this.hcEmployed ) ++ '/' ++ this.hcReserved
+    ++ this.hcEmployed.mrv ++ '/' ++ this.hcReserved
     ++ '/' ++ this.hcPlanned ++ '>'
   }
 
@@ -99,7 +99,7 @@ export class WSC {
     # terminate this thread on stop signal
     perceive this.stopped { break }
 
-    rfn = mre( this.reformNumber )
+    rfn = this.reformNumber.mrv
 
     # track delta of employment
     hcEmployed = 0
@@ -113,7 +113,7 @@ export class WSC {
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
       ai { # request reform
-        this.reformNumber <- mre( this.reformNumber ) + 1
+        this.reformNumber <- this.reformNumber.mrv + 1
       }
     }
 
@@ -248,7 +248,7 @@ export class Forager {
           # uncount this one from the team's number of working heads
           doneWSC.workers[ donePid ] = nil
           # request reform of the team
-          doneWSC.reformNumber <- mre( doneWSC.reformNumber ) + 1
+          doneWSC.reformNumber <- doneWSC.reformNumber.mrv + 1
           workers[ donePid ] = nil # forget about it
       } }
     }

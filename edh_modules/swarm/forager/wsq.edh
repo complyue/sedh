@@ -64,7 +64,7 @@ export class PRQ {
         }
         # empty PRQ
         wsc = None
-        seen'qcn = mre( this.qcn )
+        seen'qcn = this.qcn.mrv
       }
     }
     if wsc != None then {
@@ -81,7 +81,7 @@ export class PRQ {
     crq.enq( wsc ) -> {
       this.iqd[ wsc.key() ] = wsc
       # increase & post queue change number
-      qcn = mre( this.qcn )
+      qcn = this.qcn.mrv
       # do with some wrapback, don't grow the number too big
       this.qcn <- if qcn >= 1e6 then 1 else qcn+1
     }

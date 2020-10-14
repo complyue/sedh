@@ -173,10 +173,10 @@ export class HeadHunter {
   }
 
   method allFinished() {
-    eos( this.resultSink ) -> true
+    this.resultSink.eos -> true
 
-    mre( this.finishingUp ) is true
-    && mre( this.pendingCntr ) is 0
+    this.finishingUp.mrv is true
+    && this.pendingCntr.mrv is 0
     && null( this.pendingJobs )
     -> {
       this.resultSink <- nil
@@ -203,8 +203,8 @@ export class HeadHunter {
       }
 
       # failed to get a result, but we know it's not pending now
-      if mre( jobSink ) is nil then {
-        this.pendingCntr <- mre( this.pendingCntr ) - 1
+      if jobSink.mrv is nil then {
+        this.pendingCntr <- this.pendingCntr.mrv - 1
         jobSink <- nil
       }
 
@@ -215,7 +215,7 @@ export class HeadHunter {
       worker.peer.p2c( dataChan, repr( ips ) )
     } do {
       this.resultSink <- ( ips, result )
-      this.pendingCntr <- mre( this.pendingCntr ) - 1
+      this.pendingCntr <- this.pendingCntr.mrv - 1
       this.idleWorkers.push( worker )
       this.workerAvailable <- worker
       break # one ips at a time
@@ -226,7 +226,7 @@ export class HeadHunter {
     while true {
       ips = this.pendingJobs.pop()
       ips is None -> { return nil } # no more pending jobs
-      this.pendingCntr <- 1 + ( mre( this.pendingCntr ) |> 0 )
+      this.pendingCntr <- 1 + ( this.pendingCntr.mrv |> 0 )
 
       while true {
         # try grab a present idle worker and assign it this job

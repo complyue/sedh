@@ -20,9 +20,9 @@ from edh import *
 from sedh import *
 
 # work definition scripts are allowed to change the inferred configuration at
-# `hastalk.sedh.senv`, import the module as a reference, to get/set effective
+# `sedh.senv`, import the module as a reference, to get/set effective
 # artifacts living there
-import sedh.senv as senv
+import sedh.senv
 
 # we use this work definition module
 # pull in support artifacts exported from the work definition module

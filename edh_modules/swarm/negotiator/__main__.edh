@@ -30,7 +30,7 @@ effect {
 
 # we'll identify ourself as a forager to the worksource, as soon as the WSC
 # is ready to receive employment confirmation events from the channel sink
-; ( outlet = wsc.hcEmployed ) | producer _ ( outlet ) {
+; ( outlet = wsc.hcEmployed ) | () =>* {
   peer.postCommand( expr
 
     OfferHeads( {$ senv.swarmManagerPid $}, {$ wsc.hcReserved $} )

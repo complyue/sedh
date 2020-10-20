@@ -14,23 +14,22 @@ from sedh import *
 # work definition scripts are allowed to change the inferred configuration at
 # `sedh.senv`, import the module as a reference, to get/set effective
 # artifacts living there
-import sedh.senv as senv
+import sedh.senv
 
 from .etc import *
 
-import sedh
 
 logger = sedh.log.get_logger(__name__)
 
 
-# `senv` module controls how the worker processes are to be launched, then how
-# each of those processes will locate the actual job computation code
+# `sedh.senv` module controls how the worker processes are to be launched,
+# then how each of those processes will locate the actual job computation code
 
 use_haskell_workers = True
 if use_haskell_workers:
 
     # to invoke following Haskell based work from a Python based HH
-    senv.jobExecutable = [
+    sedh.senv.jobExecutable = [
         "epm",
         "exec",
         "gwd",

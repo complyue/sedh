@@ -53,7 +53,7 @@ class Worker:
             exc = None
             try:
                 exc = eol.exception()
-            except Exception as e:
+            except (Exception, asyncio.CancelledError) as e:
                 exc = e
             err_sink.publish(
                 exc or EdhPeerError(peer.ident, "Swarm worker disconnected")

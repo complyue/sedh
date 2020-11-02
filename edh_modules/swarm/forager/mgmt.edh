@@ -244,13 +244,13 @@ export class Forager {
     of { donePid:doneAct:doneDesc } -> {
       console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
       ++ ' - ' ++ doneDesc
-      case workers[ donePid ] of { doneWSC } -> { ai {
-          # uncount this one from the team's number of working heads
-          doneWSC.workers[ donePid ] = nil
-          # request reform of the team
-          doneWSC.reformNumber <- doneWSC.reformNumber.mrv + 1
-          workers[ donePid ] = nil # forget about it
-      } }
+      case workers[ donePid ] of { doneWSC } -> ai {
+        # uncount this one from the team's number of working heads
+        doneWSC.workers[ donePid ] = nil
+        # request reform of the team
+        doneWSC.reformNumber <- doneWSC.reformNumber.mrv + 1
+        workers[ donePid ] = nil # forget about it
+      }
     }
 
     # start out to have the configured total headcount available

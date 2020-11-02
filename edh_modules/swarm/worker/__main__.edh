@@ -17,6 +17,9 @@ senv = { import (** _ ) 'swarm/ENV' }
 # take the worksource connection file describer, make it a peer for comm
 peer = wscTake( senv.wscFd )
 console.debug<| 'Took worker connection to worksource: ' ++ peer
+defer {
+  console.debug<| 'Disconnecting worker for worksource ' ++ peer
+}
 
 jobSink = peer.armChannel( dataChan )
 
@@ -78,10 +81,7 @@ go for ips from initiateJobs( outlet=jobSink ) do {
     }
   }
 
-} @=> {
-  { exc } -> {
-    console.error<| 'Disconnecting worker from worksource ' ++ peer
-    ++ ' for error: ' ++ exc
-  }
-  console.debug<| 'Disconnecting worker from worksource ' ++ peer
+} @=> { exc } -> {
+  console.error<| 'Exception by worker for worksource ' ++ peer
+  ++ ' error: ' ++ exc
 }

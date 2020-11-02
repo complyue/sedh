@@ -10,7 +10,9 @@ effect import * 'net/effects'
 
 peer ?= Peer()
 console.debug<| 'Swarm forager/worker connected - ' ++ peer
-
+defer {
+  console.debug<| 'Disconnecting swarm forager/worker ' ++ peer
+}
 
 effect {
   ; @netPeer = peer
@@ -28,10 +30,7 @@ effect {
     }
   }
 
-} @=> {
-  { exc } -> {
-    console.warn<| 'Disconnected with swarm forager/worker ' ++ peer
-    ++ ' for error: ' ++ exc
-  }
-  console.debug<| 'Disconnected with swarm forager/worker ' ++ peer
+} @=> { exc } -> {
+  console.warn<| 'Exception by swarm forager/worker ' ++ peer
+  ++ ' error: ' ++ exc
 }

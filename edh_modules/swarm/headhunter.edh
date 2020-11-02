@@ -12,12 +12,9 @@ senv = { import (** _ ) 'swarm/ENV' }
 
 export class HeadHunter {
 
-  class Forager {
+  data Forager ( peer, pid ) {
     hcEmployed = 0
     hcWorking = 0
-    method __init__(
-      peer as this.peer, pid as this.pid,
-    ) pass
   }
 
   class Worker {

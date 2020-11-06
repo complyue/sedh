@@ -130,27 +130,32 @@ killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
 
 
 wscTakeProc :: Object -> "wscFd" !: Int -> EdhHostProc
-wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets = do
-  let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
-  !pktSink <- newEmptyTMVar
-  !poq     <- newEmptyTMVar
-  !chdVar  <- newTVar mempty
-  !wkrEoL  <- newEmptyTMVar
-  let !peer = Peer { edh'peer'ident    = peerId
-                   , edh'peer'eol      = wkrEoL
-                   , edh'peer'posting  = putTMVar poq
-                   , edh'peer'hosting  = takeTMVar pktSink
-                   , edh'peer'channels = chdVar
-                   }
-  !peerObj <- edhCreateHostObj peerClass (toDyn peer) []
+wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
+  mkSandbox ets caller'this $ \ !sandboxScope -> do
+    let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
+    !pktSink <- newEmptyTMVar
+    !poq     <- newEmptyTMVar
+    !chdVar  <- newTVar mempty
+    !wkrEoL  <- newEmptyTMVar
+    let !peer = Peer { edh'peer'ident    = peerId
+                     , edh'peer'sandbox  = sandboxScope
+                     , edh'peer'eol      = wkrEoL
+                     , edh'peer'posting  = putTMVar poq
+                     , edh'peer'hosting  = takeTMVar pktSink
+                     , edh'peer'channels = chdVar
+                     }
+    !peerObj <- edhCreateHostObj peerClass (toDyn peer) []
 
-  runEdhTx ets $ edhContIO $ do
-    void
-      $ forkFinally (workerThread wscFd peerId pktSink poq wkrEoL)
-      $ atomically
-      . void
-      . tryPutTMVar wkrEoL
-    atomically $ exitEdh ets exit $ EdhObject peerObj
+    runEdhTx ets $ edhContIO $ do
+      void
+        $ forkFinally (workerThread wscFd peerId pktSink poq wkrEoL)
+        $ atomically
+        . void
+        . tryPutTMVar wkrEoL
+      atomically $ exitEdh ets exit $ EdhObject peerObj
+ where
+  !ctx         = edh'context ets
+  !caller'this = edh'scope'this $ contextFrame ctx 1
 
 
 workerThread

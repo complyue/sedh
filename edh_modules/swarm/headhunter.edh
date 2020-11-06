@@ -30,7 +30,7 @@ export class HeadHunter {
         this.peer.join() $=> {
           { discExc } -> { pass }
         }
-        errSink <- discExc |> PeerError( 'Swarm worker disconnected' )
+        errSink <- discExc or PeerError( 'Swarm worker disconnected' )
       }
     }
 
@@ -223,7 +223,7 @@ export class HeadHunter {
     while true {
       ips = this.pendingJobs.pop()
       ips is None -> { return nil } # no more pending jobs
-      this.pendingCntr <- 1 + ( this.pendingCntr.mrv |> 0 )
+      this.pendingCntr <- 1 + ( this.pendingCntr.mrv or 0 )
 
       while true {
         # try grab a present idle worker and assign it this job

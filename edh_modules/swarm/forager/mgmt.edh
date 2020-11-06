@@ -177,7 +177,7 @@ export class Forager {
     headcount as this.headcount,
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
-    this.headcount >= 1 |> error( 'Invalid headcount: ' ++this.headcount )
+    this.headcount >= 1 or error( 'Invalid headcount: ' ++this.headcount )
 
     # prioritized recent queue for backlog of worksources
     this.wsq = PRQ()

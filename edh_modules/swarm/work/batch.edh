@@ -19,5 +19,5 @@ export producer manageBatchJobs(
   console.info<| 'All jobs sent out.'
   hh.finishUp()
 } @=> { # tell gwd to stop anyway
-  outlet <- nil
+  outlet <-nil
 }

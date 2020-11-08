@@ -101,6 +101,7 @@ export class HeadHunter {
     this.idleWorkers = [] # FILO queue
     this.pendingJobs = [] # FILO queue
     this.pendingCntr = sink # increased/decreased on job submit/result/err
+    this.pendingCntr <- 0 # initialize to be zero
     this.finishingUp = sink # signal of no more jobs, i.e. to start finishing up
 
     go {
@@ -176,7 +177,7 @@ export class HeadHunter {
     && this.pendingCntr.mrv is 0
     && null( this.pendingJobs )
     -> {
-      this.resultSink <- nil
+      this.resultSink <-nil
       return true
     }
 
@@ -201,8 +202,8 @@ export class HeadHunter {
 
       # failed to get a result, but we know it's not pending now
       if jobSink.mrv is nil then {
-        this.pendingCntr <- this.pendingCntr.mrv - 1
-        jobSink <- nil
+        ai this.pendingCntr <- this.pendingCntr.mrv - 1
+        jobSink <-nil
       }
 
       break # terminate this thread
@@ -212,7 +213,7 @@ export class HeadHunter {
       worker.peer.p2c( dataChan, repr( ips ) )
     } do {
       this.resultSink <- ( ips, result )
-      this.pendingCntr <- this.pendingCntr.mrv - 1
+      ai this.pendingCntr <- this.pendingCntr.mrv - 1
       this.idleWorkers.push( worker )
       this.workerAvailable <- worker
       break # one ips at a time
@@ -223,7 +224,7 @@ export class HeadHunter {
     while true {
       ips = this.pendingJobs.pop()
       ips is None -> { return nil } # no more pending jobs
-      this.pendingCntr <- 1 + ( this.pendingCntr.mrv or 0 )
+      ai this.pendingCntr <- this.pendingCntr.mrv + 1
 
       while true {
         # try grab a present idle worker and assign it this job
@@ -254,7 +255,7 @@ export class HeadHunter {
   method finishUp() {
     this.finishingUp <- true
 
-    perceive this.pendingCntr 0 -> this.allFinished()
+    perceive this.pendingCntr.subseq 0 -> this.allFinished()
 
     for (*** _ ) from this.resultSink do { pass }
   }

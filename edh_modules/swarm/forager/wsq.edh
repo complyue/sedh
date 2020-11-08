@@ -46,9 +46,8 @@ export class PRQ {
     # list of CRQs sorted by priority
     this.pv = []
 
-    # queue change number, ever increasing as each new ws enqueued
-    this.qcn = sink
-    this.qcn <- 0 # initialize to 0
+    # queue change signal
+    this.qcSignal = sink?subseq
   }
 
   generator streamOut() while true {
@@ -64,26 +63,22 @@ export class PRQ {
         }
         # empty PRQ
         wsc = None
-        seen'qcn = this.qcn.mrv
       }
     }
-    if wsc != None then {
+    if wsc is not None then {
       yield wsc # engagement with this worksource expected
       continue
     }
-    for qcn from this.qcn do { # wait until queue changed
-      qcn != seen'qcn -> { break }
-    }
+    # wait until queue changed
+    for () from this.qcSignal do break
   }
 
   method enque( wsc ) ai {
     crq = this.crq( wsc.priority )
     crq.enq( wsc ) -> {
       this.iqd[ wsc.key() ] = wsc
-      # increase & post queue change number
-      qcn = this.qcn.mrv
-      # do with some wrapback, don't grow the number too big
-      this.qcn <- if qcn >= 1e6 then 1 else qcn+1
+      # signal the queue changed
+      this.qcSignal <- ()
     }
     console.warn<| 'Worksource backlog queue full, dropping ' ++ wsc
   }

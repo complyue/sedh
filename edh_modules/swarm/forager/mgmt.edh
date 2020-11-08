@@ -35,9 +35,11 @@ export class WSC {
     # stop signal for this wsc
     this.stopped = sink
 
-    # ever increasing number to track reform bumps
-    this.reformNumber = sink
-    this.reformNumber <- 0 # initialize to 0
+    # sparking sink of signals for reform requests
+    # note lingering copy of the event sink is discarded, for convenience of
+    # all for-from-do loops against `this.reformSignal` to be subsequential,
+    # but be aware `this.reformSignal.mrv` will always return nil
+    this.reformSignal = sink?subseq
   }
 
   method __repr__() {
@@ -94,12 +96,10 @@ export class WSC {
     return this.hcReserved
   }
 
-  # this method meant to be forked once per wsc
-  method teamKeeper() {
+  # this method meant to be run once per wsc
+  method startTeamKeeper() go {
     # terminate this thread on stop signal
     perceive this.stopped { break }
-
-    rfn = this.reformNumber.mrv
 
     # track delta of employment
     hcEmployed = 0
@@ -112,17 +112,14 @@ export class WSC {
       ++ hcConfirmed ++ ' heads employed.'
       # TODO any deal with the delta ?
       hcEmployed = hcConfirmed
-      ai { # request reform
-        this.reformNumber <- this.reformNumber.mrv + 1
-      }
+      # request reform
+      this.reformSignal <- ()
     }
 
     # do reform upon appropriate chances
     while true {
       # wait next chance to reform
-      for rfn' from this.reformNumber do {
-        rfn' != rfn -> { rfn = rfn' break }
-      }
+      for () from this.reformSignal do break
       # keep enough worker processes running
       while this.workers.size < hcEmployed {
         wkrPid = wscStartWorker(
@@ -136,7 +133,7 @@ export class WSC {
   }
 
   method stop() {
-    this.hcEmployed <- nil
+    this.hcEmployed <-nil
     this.stopped <- true
 
     # forcefully stop all workers for this worksource
@@ -235,23 +232,32 @@ export class Forager {
 
   method scheduleTeams() {
 
-    # maintain mapping from pid of live worker processes to its team manager
-    workers = {}
-    go for ( wkrPid, wsc ) from this.workerStarted do workers[ wkrPid ] = wsc
+    go {@
+      # maintain mapping from pid of live worker processes to its team manager,
+      # and track done of worker processes as well
+      workers = {}
 
-    # track done of worker processes
-    go for (*** _ ) from this.workerStarted do case waitAnyWorkerDone()
-    of { donePid:doneAct:doneDesc } -> {
-      console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
-      ++ ' - ' ++ doneDesc
-      case workers[ donePid ] of { doneWSC } -> ai {
-        # uncount this one from the team's number of working heads
-        doneWSC.workers[ donePid ] = nil
-        # request reform of the team
-        doneWSC.reformNumber <- doneWSC.reformNumber.mrv + 1
-        workers[ donePid ] = nil # forget about it
+      perceive this.workerStarted {
+        nil -> { break } # assuming it'll go eos upon forager shutdown
+        # make sure it's remembered
+        # note this perceiver preempts the loop below, so no race
+        { ( wkrPid, wsc ) } -> workers[ wkrPid ] = wsc
       }
-    }
+
+      # wait for each worker process started
+      for (*** _ ) from this.workerStarted
+      do case waitAnyWorkerDone() of { donePid:doneAct:doneDesc } -> {
+        console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
+        ++ ' - ' ++ doneDesc
+        case workers[ donePid ] of { doneWSC } -> ai {
+          # uncount this one from the team's number of working heads
+          doneWSC.workers[ donePid ] = nil
+          # request reform of the team
+          doneWSC.reformSignal <- ()
+          workers[ donePid ] = nil # forget about it
+        }
+      }
+    @}
 
     # start out to have the configured total headcount available
     hcCum = this.headcount nsLastIdle = 0
@@ -289,6 +295,10 @@ export class Forager {
       hcCum -= wsc.engage( hcCum )
     }
 
+    # todo this seems unreachable, add shutdown trigger?
+    # shutdown forager, mark eos for various event sinks
+    this.hcIdle <-nil
+    this.workerStarted <-nil
   }
 
 }

@@ -131,7 +131,7 @@ killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
 
 wscTakeProc :: Object -> "wscFd" !: Int -> EdhHostProc
 wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
-  mkSandbox ets caller'this $ \ !sandboxScope -> do
+  mkObjSandbox ets caller'this $ \ !sandboxScope -> do
     let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
     !pktSink <- newEmptyTMVar
     !poq     <- newEmptyTMVar

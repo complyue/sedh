@@ -138,7 +138,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
     !chdVar  <- newTVar mempty
     !wkrEoL  <- newEmptyTMVar
     let !peer = Peer { edh'peer'ident    = peerId
-                     , edh'peer'sandbox  = sandboxScope
+                     , edh'peer'sandbox  = Just sandboxScope
                      , edh'peer'eol      = wkrEoL
                      , edh'peer'posting  = putTMVar poq
                      , edh'peer'hosting  = takeTMVar pktSink

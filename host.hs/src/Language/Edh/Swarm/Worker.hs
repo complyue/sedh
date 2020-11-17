@@ -155,7 +155,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
       atomically $ exitEdh ets exit $ EdhObject peerObj
  where
   !ctx         = edh'context ets
-  !caller'this = edh'scope'this $ contextFrame ctx 1
+  !caller'this = edh'scope'this $ callingScope ctx
 
 
 workerThread

@@ -1,9 +1,7 @@
-
 module Main where
 
-import           Prelude
-
-import           Language.Edh.Swarm
+import Language.Edh.Swarm (startSwarmWork)
+import Prelude
 
 main :: IO ()
 main = startSwarmWork $ const $ return ()

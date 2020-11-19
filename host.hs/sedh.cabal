@@ -21,49 +21,6 @@ source-repository head
   location: https://github.com/e-wrks/sedh
   subdir:   host.hs
 
-library
-  exposed-modules:    Language.Edh.Swarm
-  hs-source-dirs:     pub
-  default-language:   Haskell2010
-  default-extensions:
-    NoImplicitPrelude
-    BangPatterns
-    ConstraintKinds
-    DataKinds
-    FlexibleContexts
-    FlexibleInstances
-    GADTs
-    KindSignatures
-    LambdaCase
-    OverloadedStrings
-    ScopedTypeVariables
-    TupleSections
-    TypeApplications
-    TypeOperators
-    ViewPatterns
-
-  ghc-options:        -Wall
-  build-depends:
-    , base                  >=4.12
-    , binary
-    , bytestring
-    , clock
-    , containers
-    , edh
-    , hashable
-    , lossless-decimal
-    , mtl
-    , nedh
-    , network               >=3.1.1.1
-    , scientific
-    , sedh-internal
-    , stm                   >=2.5
-    , text
-    , time
-    , transformers
-    , unix
-    , unordered-containers
-
 executable gwd
   main-is:            Main.hs
   hs-source-dirs:     gwd
@@ -134,8 +91,10 @@ executable forage
     , text
     , transformers
 
-library sedh-internal
+library
   exposed-modules:
+    Language.Edh.Swarm
+  other-modules:
     Language.Edh.Swarm.Starter
     Language.Edh.Swarm.Worker
 

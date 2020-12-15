@@ -2,12 +2,14 @@
 import * 'net'
 
 import * 'swarm/RT'
-import * 'swarm/symbols'
+
+import * './debug'
+import * './symbols'
 
 # work definition scripts are allowed to change the inferred configuration at
 # 'swarm/ENV', import the module as a reference, to get/set effective artifacts
 # living there
-senv = { import (** _ ) 'swarm/ENV' }
+senv = import (** _ ) 'swarm/ENV'
 
 
 export class HeadHunter {
@@ -173,10 +175,10 @@ export class HeadHunter {
   method allFinished() {
     this.resultSink.eos -> true
 
-    this.finishingUp.mrv is true
+    if this.finishingUp.mrv is true
     && this.pendingCntr.mrv is 0
     && null( this.pendingJobs )
-    -> {
+    then {
       this.resultSink <-nil
       return true
     }

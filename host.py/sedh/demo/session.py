@@ -55,8 +55,19 @@ async def shouldRetryJob_(jobExc: object, ips: Dict):
     # a different ips can be returned from here to retry
 
 
-async def doSthInSession(num):
-    logger.info(f"Doing this thing in session: {num}")
+worker_cntr = 0
+
+
+async def doSthInSession(sid, num):
+    global worker_cntr
+
+    peer = effect(netPeer)
+    logger.info(f"Doing thing #{num} in session: {sid} ...")
+    await peer.p2c(
+        "ch325",
+        repr({"session": sid, "number": num, "worker_local_cntr": worker_cntr,}),
+    )
+    worker_cntr += 1
 
 
 async def run_sessions(**param_overrides):
@@ -69,28 +80,51 @@ async def run_sessions(**param_overrides):
     hh = HeadHunter()
     hh.start_hunting()
 
+    hh_cntr = 0
+    ch325 = EventSink()
+
     async def run_session(sid):
-        while True:
+        nonlocal hh_cntr
+
+        if ch325.eos:
+            logger.warn(f"Channel 325 already at eos.")
+            return
+
+        try:
+            worker = await hh.get_idle_worker()
             try:
-                worker = await hh.get_idle_worker()
+                worker.peer.arm_channel("ch325", ch325)
                 while True:
-                    logger.info(f"Triggering session action {sid+101}")
+                    hh_cntr += 1
+                    logger.info(f"Triggering action {hh_cntr} for session {sid}")
                     await worker.peer.post_command(
                         expr(
                             """
-doSthInSession( {$ sid+101 $} )
+doSthInSession( {$ sid $}, {$ hh_cntr $} )
 """
                         )
                     )
                     await asyncio.sleep(2)
-            except:
-                logger.error(f"Session worker failed.", exc_info=True)
+            finally:
+                worker.peer.stop()
+        except:
+            logger.error(f"Session worker failed.", exc_info=True)
 
-    for sid in range(2):
-        loop.create_task(run_session(sid))
+    async def spawn_sessions(n):
+        for sid in range(n):
+            loop.create_task(run_session(sid))
 
-    # blocking wait here to prevent the main coroutine/thread from terminating
-    await hh
+    # show stream of ch325 forever
+    while True:
+        try:
+            async for ch325_evt in ch325.run_producer(spawn_sessions(2)):
+                logger.info(f"Got sth from channel 325: {ch325_evt}")
+        except:
+            logger.error("Channel closed due to disconnection", exc_info=True)
+            await asyncio.sleep(5)
+
+        # allocate a new sink
+        ch325 = EventSink()
 
 
 __all_symbolic__ = {
@@ -98,4 +132,3 @@ __all_symbolic__ = {
     doOneJob: doOneJob_,
     shouldRetryJob: shouldRetryJob_,
 }
-

@@ -77,7 +77,7 @@ class HeadHunter:
     ):
         loop = asyncio.get_running_loop()
 
-        self.result_sink = result_sink
+        self.result_sink = result_sink or EventSink()
         self.server_modu = server_modu
 
         # fetch effective configurations, cache as instance attribute
@@ -118,7 +118,10 @@ class HeadHunter:
             logger.debug("Wait for idle workers.")
             self.worker_available.clear()
             await asyncio.wait(
-                [self.hunting_task, asyncio.create_task(self.worker_available.wait()),],
+                [
+                    asyncio.shield(self.hunting_task),
+                    asyncio.create_task(self.worker_available.wait()),
+                ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if self.hunting_task.done():
@@ -248,7 +251,7 @@ WorkToDo(
                 cfw_trans.sendto(pkt, (swarm_addr, swarm_port))
 
             await asyncio.wait(
-                [asyncio.sleep(cfw_interval), self.worker_available.wait()],
+                [asyncio.sleep(cfw_interval), self.result_sink.one_more()],
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -341,7 +344,7 @@ WorkToDo(
                 self.worker_available.clear()
                 await asyncio.wait(
                     [
-                        self.hunting_task,
+                        asyncio.shield(self.hunting_task),
                         asyncio.create_task(self.worker_available.wait()),
                     ],
                     return_when=asyncio.FIRST_COMPLETED,

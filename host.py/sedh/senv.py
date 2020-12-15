@@ -8,7 +8,9 @@ import os, sys
 
 # default to launch a Python work module
 jobExecutable = [
-    sys.executable,
+    "epm",
+    "x",
+    "python",
     "-m",
     "sedh.worker",
 ]

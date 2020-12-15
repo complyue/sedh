@@ -25,13 +25,13 @@ logger = sedh.log.get_logger(__name__)
 # `sedh.senv` module controls how the worker processes are to be launched,
 # then how each of those processes will locate the actual job computation code
 
-use_haskell_workers = True
+use_haskell_workers = False
 if use_haskell_workers:
 
     # to invoke following Haskell based work from a Python based HH
     sedh.senv.jobExecutable = [
         "epm",
-        "exec",
+        "x",
         "gwd",
     ]
     workModu = "swarm/demo/batch"
@@ -42,7 +42,7 @@ if use_haskell_workers:
 
 else:
 
-    # the enclosing module here is the work definition module
+    # the enclosing module here is the Python based work definition module
     workModu = __name__
 
     # this should noramlly imported from more general modules

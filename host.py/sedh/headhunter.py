@@ -2,6 +2,7 @@ __all__ = ["HeadHunter"]
 
 from typing import *
 import asyncio
+import inspect
 
 from edh import *
 from nedh import *

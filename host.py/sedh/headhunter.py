@@ -73,7 +73,7 @@ class HeadHunter:
     """
 
     def __init__(
-        self, result_sink: EventSink, server_modu: str = "sedh.hh",
+        self, result_sink: EventSink = None, server_modu: str = "sedh.hh",
     ):
         loop = asyncio.get_running_loop()
 
@@ -103,10 +103,33 @@ class HeadHunter:
     def start_hunting(self):
         if self.hunting_task is None:
             self.hunting_task = asyncio.create_task(self._run())
+        return self.hunting_task
 
     def __await__(self):
         self.start_hunting()
-        return self.hunting_task
+        yield from self.hunting_task
+
+    async def get_idle_worker(self):
+        while True:
+            if self.idle_workers:
+                worker = self.idle_workers.pop()
+                return worker
+
+            logger.debug("Wait for idle workers.")
+            self.worker_available.clear()
+            await asyncio.wait(
+                [self.hunting_task, asyncio.create_task(self.worker_available.wait()),],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if self.hunting_task.done():
+                # propagate any error ever occurred
+                await self.hunting_task
+                raise asyncio.CancelledError("HH done, no more worker to offer.")
+            logger.debug("Got idle workers.")
+
+    async def release_idle_worker(self, worker: Worker):
+        self.idle_workers.append(worker)
+        self.worker_available.set()
 
     # a swarm node connection identifying itself as a forager
     async def OfferHeads(self, forager_pid: int, max_hc: int):
@@ -225,7 +248,7 @@ WorkToDo(
                 cfw_trans.sendto(pkt, (swarm_addr, swarm_port))
 
             await asyncio.wait(
-                [asyncio.sleep(cfw_interval), self.result_sink.one_more()],
+                [asyncio.sleep(cfw_interval), self.worker_available.wait()],
                 return_when=asyncio.FIRST_COMPLETED,
             )
 

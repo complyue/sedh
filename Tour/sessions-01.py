@@ -21,15 +21,7 @@ from sedh import *
 
 # we use this work definition module
 # pull in support artifacts exported from the work definition module
-from sedh.demo.batch import *
-
-# import the work definition module's effects into this work script is a
-# workaround for effectful artifacts defined there to actually work
-import sedh.demo.batch
-
-effect_import(sedh.demo.batch)
-
-logger = sedh.log.get_logger("sedh.demo.tour")
+from sedh.demo.session import *
 
 
 # hyper parameters
@@ -45,17 +37,4 @@ effect(
 )
 
 
-# ad-hoc parameter overrides
-def m_range():
-    for m in range(7, 9):
-        yield m
-
-
-asyncio.run(
-    manage_this_work(
-        # what's specified here will override artifacts those samely named in
-        # the reused work definition module's scope, they serve as lexical
-        # default values to `manage_this_work()` defined there
-        m_range=m_range,
-    )
-)
+asyncio.run(run_sessions())

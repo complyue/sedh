@@ -4,7 +4,7 @@
 import * 'swarm/forager'
 
 sniffer = forageOn(
-  1, # headcount - number of worker processes to vend
+  2, # headcount - number of worker processes to vend
   '', # targetPrefix - prefix to filter out uninteresting work
   # local addr to sniff for call-for-workers announced to the swarm
   '127.0.0.1', 3722,

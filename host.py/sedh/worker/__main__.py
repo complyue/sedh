@@ -30,9 +30,19 @@ async def _run_():
         {netPeer: peer, dataSink: peer.ensure_channel(DATA_CHAN),}
     )
 
-    doOneJob_ = importlib.import_module(sedh.senv.jobWorkSpec).__all_symbolic__[
-        doOneJob
-    ]
+    # import the work definition module
+    work_defi_modu = importlib.import_module(sedh.senv.jobWorkSpec)
+    # obtain doOneJob
+    doOneJob_ = work_defi_modu.__all_symbolic__[doOneJob]
+    locals().update(
+        # import all exposed artifacts into local scope, so peer.read_command()
+        # has access to them
+        {
+            exp_key: getattr(work_defi_modu, exp_key)
+            for exp_key in work_defi_modu.__all__
+        }
+    )
+
     is_coro_job = inspect.iscoroutinefunction(doOneJob_)
 
     # identify this connection as swarm worker to the headhunter, then it will

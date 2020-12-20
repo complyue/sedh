@@ -3,7 +3,6 @@ module Main where
 -- import           Debug.Trace
 
 import Control.Concurrent (forkFinally)
-import Control.Concurrent.STM (atomically, writeTBQueue)
 import Control.Exception (SomeException)
 import Control.Monad
 import qualified Data.Text as T
@@ -20,7 +19,7 @@ main = do
   !starter <- determineSwarmWorkStarter
 
   !console <- defaultEdhConsole defaultEdhConsoleSettings
-  let !consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
+  let !consoleOut = consoleIO console . ConsoleOut
       runIt = do
         world <- createEdhWorld console
         installEdhBatteries world
@@ -32,7 +31,7 @@ main = do
         installSwarmBatteries starter world
 
         runEdhModule world "forage" edhModuleAsIs >>= \case
-          Left !err -> atomically $ do
+          Left !err -> do
             -- program crash on error
             consoleOut "Đ (Edh) swarm forager crashed with an error:\n"
             consoleOut $ T.pack $ show err <> "\n"
@@ -40,7 +39,7 @@ main = do
             -- clean program halt, all done
             EdhNil -> return ()
             -- unclean program exit
-            _ -> atomically $ do
+            _ -> do
               consoleOut "Đ (Edh) swarm forager halted with a result:\n"
               consoleOut $
                 (<> "\n") $ case phv of
@@ -51,11 +50,11 @@ main = do
     forkFinally runIt $ \ !result -> do
       case result of
         Left (e :: SomeException) ->
-          atomically $ consoleOut $ "💥 " <> T.pack (show e)
+          consoleOut $ "💥 " <> T.pack (show e)
         Right _ -> pure ()
       -- shutdown console IO anyway
-      atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
+      consoleIO console ConsoleShutdown
 
-  atomically $ consoleOut ">> Đ (Edh) Swarming Forager <<\n"
+  consoleOut ">> Đ (Edh) Swarming Forager <<\n"
 
   consoleIOLoop console

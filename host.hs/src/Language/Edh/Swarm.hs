@@ -11,7 +11,6 @@ where
 -- import           Debug.Trace
 
 import Control.Concurrent (forkFinally)
-import Control.Concurrent.STM (atomically, writeTBQueue)
 import Control.Exception (SomeException)
 import Control.Monad.Reader
 import qualified Data.Text as T
@@ -98,8 +97,8 @@ startSwarmWork' !runRepl !worldCustomization = do
     determineSwarmWorkStarter
 
   !console <- defaultEdhConsole defaultEdhConsoleSettings
-  let consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
-      consoleShutdown = writeTBQueue (consoleIO console) ConsoleShutdown
+  let consoleOut = consoleIO console . ConsoleOut
+      consoleShutdown = consoleIO console ConsoleShutdown
 
       workProg :: IO ()
       workProg = do
@@ -124,20 +123,17 @@ startSwarmWork' !runRepl !worldCustomization = do
           !workScript
             | wscFd == 0 ->
               runEdhFile world (T.unpack workScript) >>= \case
-                Left !err -> atomically $ do
+                Left !err -> do
                   -- program crash on error
                   consoleOut "Swarm headhunter crashed with an error:\n"
                   consoleOut $ T.pack $ show err <> "\n"
                 Right !phv -> case edhUltimate phv of
-                  -- clean program halt, all done
                   EdhNil ->
-                    atomically $
-                      consoleOut $
-                        "Swarm work script "
-                          <> workScript
-                          <> " done right.\n"
-                  -- unclean program exit
-                  _ -> atomically $ do
+                    -- clean program halt, all done
+                    consoleOut $
+                      "Swarm work script " <> workScript <> " done right.\n"
+                  _ -> do
+                    -- unclean program exit
                     consoleOut "Swarm headhunter halted with a result:\n"
                     consoleOut $
                       (<> "\n") $ case phv of
@@ -147,33 +143,33 @@ startSwarmWork' !runRepl !worldCustomization = do
           -- run in swarm worker mode
           _workModu ->
             runEdhModule world "swarm/worker" edhModuleAsIs >>= \case
-              Left !err -> atomically $ do
+              Left !err -> do
                 -- program crash on error
                 consoleOut "Swarm worker crashed with an error:\n"
                 consoleOut $ T.pack $ show err <> "\n"
               Right !phv -> case edhUltimate phv of
                 -- clean program halt, all done
-                EdhNil -> atomically $ consoleOut "Swarm worker right retired.\n"
+                EdhNil -> consoleOut "Swarm worker right retired.\n"
                 -- unclean program exit
-                _ -> atomically $ do
+                _ -> do
                   consoleOut "Swarm worker halted with a result:\n"
                   consoleOut $
                     (<> "\n") $ case phv of
                       EdhString msg -> msg
                       _ -> T.pack $ show phv
 
-        atomically consoleShutdown
+        consoleShutdown
 
   void $
     forkFinally workProg $ \result -> do
       case result of
         Left (e :: SomeException) ->
-          atomically $ consoleOut $ "💥 " <> T.pack (show e)
+          consoleOut $ "💥 " <> T.pack (show e)
         Right _ -> pure ()
       -- shutdown console IO anyway
-      atomically $ writeTBQueue (consoleIO console) ConsoleShutdown
+      consoleIO console ConsoleShutdown
 
-  atomically $ case workSpec of
+  case workSpec of
     -- run in repl mode
     "" -> return ()
     -- run in headhunter mode
@@ -201,11 +197,10 @@ startSwarmWork' !runRepl !worldCustomization = do
 -- | Manage lifecycle of Edh programs during the repl session
 swarmRepl :: EdhConsole -> EdhWorld -> IO ()
 swarmRepl !console !world = do
-  atomically $ do
-    consoleOut ">> Get Work Done - by a swarm <<\n"
-    consoleOut
-      "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
-    consoleOut "  https://github.com/e-wrks/sedh/tree/master/Tour\n"
+  consoleOut ">> Get Work Done - by a swarm <<\n"
+  consoleOut
+    "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
+  consoleOut "  https://github.com/e-wrks/sedh/tree/master/Tour\n"
 
   -- here being the host interpreter, we loop infinite runs of the Edh
   -- console REPL program, unless cleanly shutdown, for resilience
@@ -217,30 +212,28 @@ swarmRepl !console !world = do
           -- survive program crashes.
           Left !err -> do
             -- program crash on error
-            atomically $ do
-              consoleOut "Your program crashed with an error:\n"
-              consoleOut $ T.pack $ show err <> "\n"
+            consoleOut "Your program crashed with an error:\n"
+            consoleOut $ T.pack $ show err <> "\n"
+            -- the world with all modules ever imported, is still
+            -- there, repeat another repl session with this world.
+            -- it may not be a good idea, but just so so ...
+            consoleOut "🐴🐴🐯🐯\n"
+            doneRightOrRebirth
+          Right !phv -> case edhUltimate phv of
+            -- clean program halt, all done
+            EdhNil -> consoleOut "Well done, bye.\n"
+            _ -> do
+              -- unclean program exit
+              consoleOut "Your program halted with a result:\n"
+              consoleOut $
+                (<> "\n") $ case phv of
+                  EdhString msg -> msg
+                  _ -> T.pack $ show phv
               -- the world with all modules ever imported, is still
               -- there, repeat another repl session with this world.
               -- it may not be a good idea, but just so so ...
               consoleOut "🐴🐴🐯🐯\n"
-            doneRightOrRebirth
-          Right !phv -> case edhUltimate phv of
-            -- clean program halt, all done
-            EdhNil -> atomically $ consoleOut "Well done, bye.\n"
-            _ -> do
-              -- unclean program exit
-              atomically $ do
-                consoleOut "Your program halted with a result:\n"
-                consoleOut $
-                  (<> "\n") $ case phv of
-                    EdhString msg -> msg
-                    _ -> T.pack $ show phv
-                -- the world with all modules ever imported, is still
-                -- there, repeat another repl session with this world.
-                -- it may not be a good idea, but just so so ...
-                consoleOut "🐴🐴🐯🐯\n"
               doneRightOrRebirth
   doneRightOrRebirth
   where
-    !consoleOut = writeTBQueue (consoleIO console) . ConsoleOut
+    !consoleOut = consoleIO console . ConsoleOut

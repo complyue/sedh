@@ -1,0 +1,55 @@
+{#
+ # Demonstrate a simple, session based, parallel work definition,
+ # for a swarm to compute.
+ #}
+
+import * 'swarm'
+import * 'swarm/headhunter'
+
+
+namespace workerLocal ( cntr=0 ) pass
+
+export method doSthInSession( sid, num ) {
+  peer = perform @netPeer
+  console.info<| 'Doing this #' ++ num ++ ' in session: ' ++ sid ++ ' ...'
+  peer.p2c( 'ch325', repr${
+      'session': sid, 'number': num, 'worker_local_cntr': workerLocal.cntr,
+  } )
+  workerLocal.cntr += 1
+}
+
+
+{#
+ # this is the job entry for each one particular ips (instantiated
+ # parameter set) to be worked out by a swarm worker process
+ #
+ # such a procedure usually uses a wild arguments receiver, so
+ # arbitrary parameters can be overridden, with defaults from the
+ # module scope out here.
+ #}
+export method @doOneJob * {
+  # this single job will never end until the nedh connection is disconnected
+  peer = perform @netPeer
+  for _ from peer.eol do pass
+}
+
+
+{#
+ # this is supposed to be the reused entry function
+ #}
+export method runSessions * {
+
+  # the enclosing module here is the work definition module
+  effect @workDefinition = __name__
+
+  # log and retry on job failure
+  effect method @shouldRetryJob ( jobExc, ips ) {
+    console.error<| 'Job failed: ' ++ jobExc
+    return ips # retry the same ips
+    # a different ips can be returned from here to retry
+  }
+
+  hh = HeadHunter()
+  # TODO XXX
+
+}

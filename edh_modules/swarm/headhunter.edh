@@ -88,7 +88,7 @@ export class HeadHunter {
     return nil
   }
 
-  method __init__( resultSink as this.resultSink ) {
+  method __init__( resultSink as this.resultSink = sink ) {
     # fetch effective configurations, cache as instance attribute
     this.priority = perform priority
     this.headcount = perform headcount

@@ -6,8 +6,6 @@ __all__ = [
 from typing import *
 import asyncio
 
-import time
-
 from edh import *
 from nedh import *
 from sedh import *
@@ -36,6 +34,9 @@ if use_haskell_workers:
         "gwd",
     ]
     workModu = "swarm/demo/session"
+
+    async def doOneJob_(**ips):
+        assert False, "not for Python worker to do this"
 
 
 else:

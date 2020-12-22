@@ -1,11 +1,9 @@
-#
-# Demonstrate a simple, batch based, parallel work definition,
-# for a swarm to compute.
-#
+{#
+ # Demonstrate a simple, batch based, parallel work definition,
+ # for a swarm to compute.
+ #}
 
-# re-export swarm symbols so entry modules can simply do
-#  `import * '.'`
-export import * 'swarm'
+import * 'swarm'
 
 
 # this computation procedure is put here for simplicity of

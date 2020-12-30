@@ -246,7 +246,7 @@ export class Forager {
 
       # wait for each worker process started
       for (*** _ ) from this.workerStarted
-      do case waitAnyWorkerDone() of { donePid:doneAct:doneDesc } -> {
+      do case waitAnyWorkerDone() of { ( donePid:doneAct:doneDesc ) } -> {
         console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
         case workers[ donePid ] of { doneWSC } -> ai {

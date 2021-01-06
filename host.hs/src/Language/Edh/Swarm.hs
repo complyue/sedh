@@ -29,62 +29,79 @@ import Language.Edh.Swarm.Worker
 import Prelude
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
-installSwarmBatteries (SwarmWorkStarter !executable !workDir !workSpec !managerPid !workerPid !wscFd) !world =
-  do
-    void $
-      installEdhModule world "swarm/ENV" $ \ !ets !exit -> do
-        let !moduScope = contextScope $ edh'context ets
-        iopdUpdate
-          [ (AttrByName "jobExecutable", EdhString executable),
-            (AttrByName "jobWorkDir", EdhString workDir),
-            (AttrByName "jobWorkSpec", EdhString workSpec),
-            (AttrByName "swarmManagerPid", EdhDecimal $ fromIntegral managerPid),
-            (AttrByName "swarmWorkerPid", EdhDecimal $ fromIntegral workerPid),
-            (AttrByName "wscFd", EdhDecimal $ fromIntegral wscFd)
-          ]
-          (edh'scope'entity moduScope)
-        exit
+installSwarmBatteries
+  ( SwarmWorkStarter
+      !executable
+      !workDir
+      !workSpec
+      !managerPid
+      !workerPid
+      !wscFd
+    )
+  !world =
+    do
+      void $
+        installEdhModule world "swarm/ENV" $ \ !ets !exit -> do
+          let !moduScope = contextScope $ edh'context ets
+          iopdUpdate
+            [ (AttrByName "jobExecutable", EdhString executable),
+              (AttrByName "jobWorkDir", EdhString workDir),
+              (AttrByName "jobWorkSpec", EdhString workSpec),
+              ( AttrByName "swarmManagerPid",
+                EdhDecimal $ fromIntegral managerPid
+              ),
+              ( AttrByName "swarmWorkerPid",
+                EdhDecimal $ fromIntegral workerPid
+              ),
+              (AttrByName "wscFd", EdhDecimal $ fromIntegral wscFd)
+            ]
+            (edh'scope'entity moduScope)
+          exit
 
-    void $
-      installEdhModule world "swarm/RT" $ \ !ets !exit ->
-        -- loosely depend on the @net@ runtime from nedh project
-        runEdhTx ets $
-          importEdhModule "net/RT" $ \case
-            EdhObject !moduNetRT -> \_ets ->
-              lookupEdhObjAttr moduNetRT (AttrByName "Peer") >>= \case
-                (_, EdhObject !peerClass) -> do
-                  let !moduScope = contextScope $ edh'context ets
+      void $
+        installEdhModule world "swarm/RT" $ \ !ets !exit ->
+          -- loosely depend on the @net@ runtime from nedh project
+          runEdhTx ets $
+            importEdhModule "net/RT" $ \case
+              EdhObject !moduNetRT -> \_ets ->
+                lookupEdhObjAttr moduNetRT (AttrByName "Peer") >>= \case
+                  (_, EdhObject !peerClass) -> do
+                    let !moduScope = contextScope $ edh'context ets
 
-                  !moduArts <-
-                    sequence $
-                      [ (nm,) <$> mkHostProc moduScope mc nm hp
-                        | (nm, mc, hp) <-
-                            [ ("killWorker", EdhMethod, wrapHostProc killWorkerProc),
-                              ( "wscTake",
-                                EdhMethod,
-                                wrapHostProc $ wscTakeProc peerClass
-                              ),
-                              ( "waitAnyWorkerDone",
-                                EdhMethod,
-                                wrapHostProc waitAnyWorkerDoneProc
-                              ),
-                              ( "wscStartWorker",
-                                EdhMethod,
-                                wrapHostProc wscStartWorkerProc
-                              )
-                            ]
-                      ]
+                    !moduArts <-
+                      sequence $
+                        [ (nm,) <$> mkHostProc moduScope mc nm hp
+                          | (nm, mc, hp) <-
+                              [ ( "killWorker",
+                                  EdhMethod,
+                                  wrapHostProc killWorkerProc
+                                ),
+                                ( "wscTake",
+                                  EdhMethod,
+                                  wrapHostProc $ wscTakeProc peerClass
+                                ),
+                                ( "waitAnyWorkerDone",
+                                  EdhMethod,
+                                  wrapHostProc waitAnyWorkerDoneProc
+                                ),
+                                ( "wscStartWorker",
+                                  EdhMethod,
+                                  wrapHostProc wscStartWorkerProc
+                                )
+                              ]
+                        ]
 
-                  !artsDict <-
-                    EdhDict
-                      <$> createEdhDict [(EdhString k, v) | (k, v) <- moduArts]
-                  flip iopdUpdate (edh'scope'entity moduScope) $
-                    [(AttrByName k, v) | (k, v) <- moduArts]
-                      ++ [(AttrByName "__exports__", artsDict)]
+                    !artsDict <-
+                      EdhDict
+                        <$> createEdhDict
+                          [(EdhString k, v) | (k, v) <- moduArts]
+                    flip iopdUpdate (edh'scope'entity moduScope) $
+                      [(AttrByName k, v) | (k, v) <- moduArts]
+                        ++ [(AttrByName "__exports__", artsDict)]
 
-                  exit
-                _ -> error "bug: net/RT provides no Peer class"
-            _ -> error "bug: importEdhModule returned non-object"
+                    exit
+                  _ -> error "bug: net/RT provides no Peer class"
+              _ -> error "bug: importEdhModule returned non-object"
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization =
@@ -93,7 +110,14 @@ startSwarmWork !worldCustomization =
 startSwarmWork' ::
   (EdhConsole -> EdhWorld -> IO ()) -> (EdhWorld -> IO ()) -> IO ()
 startSwarmWork' !runRepl !worldCustomization = do
-  starter@(SwarmWorkStarter _executable _workDir !workSpec !managerPid !workerPid !wscFd) <-
+  starter@( SwarmWorkStarter
+              _executable
+              _workDir
+              !workSpec
+              !managerPid
+              !workerPid
+              !wscFd
+            ) <-
     determineSwarmWorkStarter
 
   !console <- defaultEdhConsole defaultEdhConsoleSettings

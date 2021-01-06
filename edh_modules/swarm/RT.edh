@@ -1,15 +1,36 @@
-
-{#
+{##
  # This is the sentinel file stand in place of a host module that
  # should have been installed by the host interpreter, which contains
- # host procedures, classes and other artifacts defined via EHI,
- # and obviously, written in the host language (i.e. Haskell)
+ # host procedures, classes and other artifacts defined via EHI
+ # (which is obviously written in the host language i.e. Haskell)
  #
  # Execution of this module file is a sign showing that wrong Edh
  # interpreter is used to run the program.
  #}
-error( 'Missing host module: ' ++ __name__ )
+if running!true # should be treated as false for proper control-flow analysis
+then error( 'Missing host module: ' ++ __name__ )
 
-# TODO mockups of procedures and other artifacts can be written in
-#      this source file, to give meaningful information to IDEs and/or
-#      other tools, for purpose of, e.g. auto completion.
+# rest of the source here serves as meta documentation for aforementioned
+# host artifacts, and is meant to be leveraged by IDE tools (such as els)
+# with source code analysis capabilities, to aid the developers
+
+import ( Peer, **_ ) 'net'
+
+
+export {
+
+  killWorker :: ( pid!int!DecimalType ) -> nil
+  {##
+   # Kill a worker process by pid
+   #}
+  method killWorker( workerPid ) pass
+
+
+  wscTake :: ( fd!int!DecimalType ) -> Peer
+  {##
+   # Take a work-source connection by file-descriptor number
+   #}
+  method wscTake( wscFd ) pass
+
+
+}

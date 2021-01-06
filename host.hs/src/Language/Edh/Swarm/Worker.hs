@@ -41,7 +41,11 @@ waitAnyWorkerDoneProc :: EdhHostProc
 waitAnyWorkerDoneProc !exit !ets =
   if edh'in'tx ets
     then throwEdh ets UsageError "you don't wait within a transaction"
-    else runEdhTx ets $ edhContIO $ waitAnyWorker >>= atomically . exitEdh ets exit
+    else
+      runEdhTx ets $
+        edhContIO $
+          waitAnyWorker
+            >>= atomically . exitEdh ets exit
   where
     waitAnyWorker :: IO EdhValue
     waitAnyWorker =
@@ -63,7 +67,9 @@ waitAnyWorkerDoneProc !exit !ets =
                   T.pack $
                     "by "
                       <> show sig
-                      <> if coreDumped then " with" else " without" <> " core dumped"
+                      <> if coreDumped
+                        then " with"
+                        else " without" <> " core dumped"
           Stopped !sig ->
             return $
               EdhPair
@@ -79,60 +85,69 @@ wscStartWorkerProc ::
   "jobExecutable" !: EdhValue ->
   "workModu" !: Text ->
   EdhHostProc
-wscStartWorkerProc (mandatoryArg -> !wsAddrObj) (mandatoryArg -> !workDir) (mandatoryArg -> !jobExecutable) (mandatoryArg -> workModu) !exit !ets =
-  if edh'in'tx ets
-    then throwEdh ets UsageError "you don't start worker within a transaction"
-    else prepCmdl $ \ !wkrCmdl ->
-      serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
-        runEdhTx ets $
-          edhContIO $ do
-            let !hints =
-                  defaultHints {addrFlags = [AI_PASSIVE], addrSocketType = Stream}
-            addr : _ <-
-              getAddrInfo
-                (Just hints)
-                (Just $ T.unpack servAddr)
-                (Just (show servPort))
-            bracket
-              ( socket
-                  (addrFamily addr)
-                  (addrSocketType addr)
-                  (addrProtocol addr)
-              )
-              close
-              $ \ !sock -> do
-                connect sock (addrAddress addr)
-                bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
-                  -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                  setFdOption (Fd wscFd) CloseOnExec False
-                  !wkrPid <- forkProcess $ do
-                    changeWorkingDirectory $ T.unpack workDir
-                    executeFile
-                      "/usr/bin/env"
-                      False
-                      (wkrCmdl ++ [T.unpack workModu, show wscFd])
-                      Nothing
-                  atomically $
-                    exitEdh ets exit $
-                      EdhDecimal $
-                        fromIntegral
-                          wkrPid
-  where
-    strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
-    strSeq [] !sl exit' = exit' $ reverse sl
-    strSeq (v : vs) !sl exit' = case edhUltimate v of
-      EdhString !s -> strSeq vs (T.unpack s : sl) exit'
-      _ ->
-        throwEdh ets UsageError $
-          "In exec cmdl, not a string: "
-            <> T.pack
-              (show v)
-    prepCmdl :: ([String] -> STM ()) -> STM ()
-    prepCmdl !exit' = case jobExecutable of
-      EdhString !executable -> exit' [T.unpack executable]
-      EdhArgsPack (ArgsPack !vs _) -> strSeq vs [] exit'
-      EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq vs [] exit'
-      _ -> throwEdh ets UsageError "invalid jobExecutable"
+wscStartWorkerProc
+  (mandatoryArg -> !wsAddrObj)
+  (mandatoryArg -> !workDir)
+  (mandatoryArg -> !jobExecutable)
+  (mandatoryArg -> workModu)
+  !exit
+  !ets =
+    if edh'in'tx ets
+      then throwEdh ets UsageError "you don't start worker within a transaction"
+      else prepCmdl $ \ !wkrCmdl ->
+        serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
+          runEdhTx ets $
+            edhContIO $ do
+              let !hints =
+                    defaultHints
+                      { addrFlags = [AI_PASSIVE],
+                        addrSocketType = Stream
+                      }
+              addr : _ <-
+                getAddrInfo
+                  (Just hints)
+                  (Just $ T.unpack servAddr)
+                  (Just (show servPort))
+              bracket
+                ( socket
+                    (addrFamily addr)
+                    (addrSocketType addr)
+                    (addrProtocol addr)
+                )
+                close
+                $ \ !sock -> do
+                  connect sock (addrAddress addr)
+                  bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+                    -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                    setFdOption (Fd wscFd) CloseOnExec False
+                    !wkrPid <- forkProcess $ do
+                      changeWorkingDirectory $ T.unpack workDir
+                      executeFile
+                        "/usr/bin/env"
+                        False
+                        (wkrCmdl ++ [T.unpack workModu, show wscFd])
+                        Nothing
+                    atomically $
+                      exitEdh ets exit $
+                        EdhDecimal $
+                          fromIntegral
+                            wkrPid
+    where
+      strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
+      strSeq [] !sl exit' = exit' $ reverse sl
+      strSeq (v : vs) !sl exit' = case edhUltimate v of
+        EdhString !s -> strSeq vs (T.unpack s : sl) exit'
+        _ ->
+          throwEdh ets UsageError $
+            "In exec cmdl, not a string: "
+              <> T.pack
+                (show v)
+      prepCmdl :: ([String] -> STM ()) -> STM ()
+      prepCmdl !exit' = case jobExecutable of
+        EdhString !executable -> exit' [T.unpack executable]
+        EdhArgsPack (ArgsPack !vs _) -> strSeq vs [] exit'
+        EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq vs [] exit'
+        _ -> throwEdh ets UsageError "invalid jobExecutable"
 
 killWorkerProc :: "workerPid" !: Int -> EdhHostProc
 killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
@@ -190,7 +205,7 @@ workerThread ::
   TMVar (Either SomeException ()) ->
   IO ()
 workerThread !wscFd !peerId !pktSink !poq !wkrEoL =
-  bracket (mkSocket $ fromIntegral wscFd) close $ \sock ->
+  bracket (mkSocket $ fromIntegral wscFd) close $ \ !sock ->
     try (netComm sock)
       >>= (gracefulClose sock 5000 <*)
         . atomically

@@ -129,9 +129,7 @@ wscStartWorkerProc
                         Nothing
                     atomically $
                       exitEdh ets exit $
-                        EdhDecimal $
-                          fromIntegral
-                            wkrPid
+                        EdhDecimal $ fromIntegral wkrPid
     where
       strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
       strSeq [] !sl exit' = exit' $ reverse sl

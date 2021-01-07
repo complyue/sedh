@@ -32,5 +32,26 @@ export {
    #}
   method wscTake( wscFd ) pass
 
+  waitAnyWorkerDone :: ()
+  -> pid!int!DecimalType:'exited'
+  || pid!int!DecimalType:'killed by <signal> with(out) core dumped'
+  || pid!int!DecimalType:'stopped by <signal>'
+  {##
+   # Wait for next worker process done
+   #}
+  method waitAnyWorkerDone() pass
+
+  wscStartWorker :: (
+    Addr,
+    dir!path!StringType,
+    cmdl! StringType||ArgsPackType||ListType,
+    module'name!StringType,
+  ) -> pid!int!DecimalType
+  {##
+   # Start a worker subprocess
+   #}
+  method wscStartWorker(
+    wsAddr, workDir, jobExecutable, workModu,
+  ) pass
 
 }

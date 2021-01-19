@@ -33,11 +33,13 @@ export {
   method wscTake( wscFd ) pass
 
   waitAnyWorkerDone :: ()
-  -> pid!int!DecimalType:'exited'
-  || pid!int!DecimalType:'killed by <signal> with(out) core dumped'
-  || pid!int!DecimalType:'stopped by <signal>'
+  -> pid!int!DecimalType:eg!'exited'
+  || pid!int!DecimalType:eg!'killed by <signal> with(out) core dumped'
+  || pid!int!DecimalType:eg!'stopped by <signal>'
   {##
    # Wait for next worker process done
+   #
+   # Will return a pair of pid number and result message
    #}
   method waitAnyWorkerDone() pass
 

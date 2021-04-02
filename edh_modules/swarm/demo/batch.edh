@@ -61,6 +61,9 @@ export method @doOneJob * {
 
   console.debug<| 'Returning result ' ++ result
   # return result of the job
+  # here we return a dict instead of Đ native apk like result already be, so a
+  # Python job scheduler can be used without glitches. While an apk would be
+  # more idiomatic within a system exclusively in Đ.
   return {} =< result
 }
 
@@ -93,6 +96,7 @@ export method manageThisWork * {
     for m from m_range() do
     for n from n_range() do
     not exclude( m, n ) -> {
+      # use a dict instead of apk for Python interoperability again
       yield {} =<( m=m, n=n, )
     }
   }

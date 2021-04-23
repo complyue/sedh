@@ -23,7 +23,8 @@ jobWorkDir = os.getcwd()
 #  the .py file on command line of python, the work scheduler script
 # - in worker process:
 #  name of the work definition module
-jobWorkSpec = sys.argv[0]
+def jobWorkSpec():
+    return sys.argv[0]
 
 
 # os pid of forager process
@@ -33,8 +34,8 @@ swarmManagerPid = os.getppid()
 swarmWorkerPid = os.getpid()
 
 # os file descripter number for the socket connected to hh from worker
-wscFd = 15
-
-if len(sys.argv) == 3:
-    jobWorkSpec, wscFds = sys.argv[1:]
-    wscFd = int(wscFds)
+def wscFd():
+    if len(sys.argv) == 3:
+        _jobWorkSpec, wscFds = sys.argv[1:]
+        return int(wscFds)
+    raise RuntimeError("Not a recognized Sedh worker cmdl: " + sys.argv)

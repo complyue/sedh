@@ -18,7 +18,7 @@ logger = sedh.log.get_logger(__package__)
 async def _run_():
     loop = asyncio.get_running_loop()
 
-    peer = await takeEdhFd(sedh.senv.wscFd)
+    peer = await takeEdhFd(sedh.senv.wscFd())
 
     jobSink = peer.ensure_channel(DATA_CHAN)
 
@@ -31,7 +31,7 @@ async def _run_():
     )
 
     # import the work definition module
-    work_defi_modu = importlib.import_module(sedh.senv.jobWorkSpec)
+    work_defi_modu = importlib.import_module(sedh.senv.jobWorkSpec())
     # obtain doOneJob
     doOneJob_ = work_defi_modu.__all_symbolic__[doOneJob]
     locals().update(

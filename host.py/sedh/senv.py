@@ -24,7 +24,10 @@ jobWorkDir = os.getcwd()
 # - in worker process:
 #  name of the work definition module
 def jobWorkSpec():
-    return sys.argv[0]
+    if len(sys.argv) == 3:
+        jobWorkSpec, _wscFds = sys.argv[1:]
+        return jobWorkSpec
+    raise RuntimeError("Not a recognized Sedh worker cmdl: " + sys.argv)
 
 
 # os pid of forager process

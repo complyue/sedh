@@ -4,27 +4,8 @@ module Language.Edh.Swarm.Worker where
 
 import Control.Concurrent (forkFinally, forkIO, threadDelay)
 import Control.Concurrent.STM
-  ( STM,
-    TMVar,
-    atomically,
-    newEmptyTMVar,
-    newTVar,
-    orElse,
-    putTMVar,
-    readTMVar,
-    readTVar,
-    takeTMVar,
-    tryPutTMVar,
-  )
 import Control.Exception
-  ( SomeException,
-    bracket,
-    catch,
-    handle,
-    try,
-  )
 import Control.Monad
-import Data.Dynamic (toDyn)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Language.Edh.EHI
@@ -181,7 +162,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
               edh'peer'hosting = takeTMVar pktSink,
               edh'peer'channels = chdVar
             }
-    !peerObj <- edhCreateHostObj peerClass (toDyn peer) []
+    !peerObj <- edhCreateHostObj peerClass peer
 
     runEdhTx ets $
       edhContIO $ do

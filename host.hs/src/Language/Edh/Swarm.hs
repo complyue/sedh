@@ -62,46 +62,44 @@ installSwarmBatteries
         installEdhModule world "swarm/RT" $ \ !ets !exit ->
           -- loosely depend on the @net@ runtime from nedh project
           runEdhTx ets $
-            importEdhModule "net/RT" $ \case
-              EdhObject !moduNetRT -> \_ets ->
-                lookupEdhObjAttr moduNetRT (AttrByName "Peer") >>= \case
-                  (_, EdhObject !peerClass) -> do
-                    let !moduScope = contextScope $ edh'context ets
+            importEdhModule "net/RT" $ \ !moduNetRT _ets ->
+              lookupEdhObjAttr moduNetRT (AttrByName "Peer") >>= \case
+                (_, EdhObject !peerClass) -> do
+                  let !moduScope = contextScope $ edh'context ets
 
-                    !moduArts <-
-                      sequence $
-                        [ (nm,) <$> mkHostProc moduScope mc nm hp
-                          | (nm, mc, hp) <-
-                              [ ( "killWorker",
-                                  EdhMethod,
-                                  wrapHostProc killWorkerProc
-                                ),
-                                ( "wscTake",
-                                  EdhMethod,
-                                  wrapHostProc $ wscTakeProc peerClass
-                                ),
-                                ( "waitAnyWorkerDone",
-                                  EdhMethod,
-                                  wrapHostProc waitAnyWorkerDoneProc
-                                ),
-                                ( "wscStartWorker",
-                                  EdhMethod,
-                                  wrapHostProc wscStartWorkerProc
-                                )
-                              ]
-                        ]
+                  !moduArts <-
+                    sequence $
+                      [ (nm,) <$> mkHostProc moduScope mc nm hp
+                        | (nm, mc, hp) <-
+                            [ ( "killWorker",
+                                EdhMethod,
+                                wrapHostProc killWorkerProc
+                              ),
+                              ( "wscTake",
+                                EdhMethod,
+                                wrapHostProc $ wscTakeProc peerClass
+                              ),
+                              ( "waitAnyWorkerDone",
+                                EdhMethod,
+                                wrapHostProc waitAnyWorkerDoneProc
+                              ),
+                              ( "wscStartWorker",
+                                EdhMethod,
+                                wrapHostProc wscStartWorkerProc
+                              )
+                            ]
+                      ]
 
-                    !artsDict <-
-                      EdhDict
-                        <$> createEdhDict
-                          [(EdhString k, v) | (k, v) <- moduArts]
-                    flip iopdUpdate (edh'scope'entity moduScope) $
-                      [(AttrByName k, v) | (k, v) <- moduArts]
-                        ++ [(AttrByName "__exports__", artsDict)]
+                  !artsDict <-
+                    EdhDict
+                      <$> createEdhDict
+                        [(EdhString k, v) | (k, v) <- moduArts]
+                  flip iopdUpdate (edh'scope'entity moduScope) $
+                    [(AttrByName k, v) | (k, v) <- moduArts]
+                      ++ [(AttrByName "__exports__", artsDict)]
 
-                    exit
-                  _ -> error "bug: net/RT provides no Peer class"
-              _ -> error "bug: importEdhModule returned non-object"
+                  exit
+                _ -> error "bug: net/RT provides no Peer class"
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization =

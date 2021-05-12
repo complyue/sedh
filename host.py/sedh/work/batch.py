@@ -28,6 +28,6 @@ async def manage_batch_jobs(
             await hh.dispatch_job(ips)
         logger.info("All jobs sent out.")
         await hh.finish_up()
-        await hh.stop()
+        hh.stop()
     finally:
         outlet.publish(EndOfStream)

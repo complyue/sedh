@@ -85,7 +85,7 @@ async def manage_this_work(**param_overrides):
     # file is a workaround so far
     effect(__all_symbolic__)
 
-    def iter_params():
+    async def iter_params():
         for m in m_range():
             for n in n_range():
                 if not exclude(m, n):

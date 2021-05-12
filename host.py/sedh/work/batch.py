@@ -23,7 +23,7 @@ async def manage_batch_jobs(
     try:
         hh = HeadHunter(outlet)
         hh.start_hunting()
-        for ips in params():
+        async for ips in params():
             logger.debug(f"Dispatching job ips={ips!r}")
             await hh.dispatch_job(ips)
         logger.info("All jobs sent out.")

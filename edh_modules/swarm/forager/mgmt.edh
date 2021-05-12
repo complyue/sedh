@@ -39,7 +39,7 @@ export class WSC {
     # note lingering copy of the event sink is discarded, for convenience of
     # all for-from-do loops against `this.reformSignal` to be subsequential,
     # but be aware `this.reformSignal.mrv` will always return nil
-    this.reformSignal = sink?subseq
+    this.reformSignal = sink.subseq
   }
 
   method __repr__() {
@@ -244,9 +244,9 @@ export class Forager {
         { ( wkrPid, wsc ) } -> workers[ wkrPid ] = wsc
       }
 
-      # wait for each worker process started
+      # for each worker process started, wait one exited
       for (*** _ ) from this.workerStarted
-      do case waitAnyWorkerDone() of { ( donePid:doneAct:doneDesc ) } -> {
+      do case waitAnyWorkerDone() of {( donePid:doneAct:doneDesc )} -> {
         console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
         case workers[ donePid ] of { doneWSC } -> ai {

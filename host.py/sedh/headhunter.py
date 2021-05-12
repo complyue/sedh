@@ -97,6 +97,19 @@ class HeadHunter:
         self.pending_cntr = 0  # increased/decreased on job submit/result/err
         self.finishing_up = False  # signal of no more jobs, i.e. to start finishing up
 
+        self.net_server = None
+
+    def stop(self):
+        server = self.net_server
+        if server is not None:
+            server.stop()
+        while self.idle_workers:
+            worker = self.idle_workers.pop()
+            worker.peer.stop()
+        while self.foragers:
+            peer, _forager = self.foragers.popitem()
+            peer.stop()
+
     def all_finished(self) -> bool:
         return self.finishing_up and self.pending_cntr == 0 and not self.pending_jobs
 
@@ -184,6 +197,7 @@ class HeadHunter:
             0,  # local port to bind
             init=swarm_conn_init,
         )
+        self.net_server = server
         ws_sockets = server.server_sockets.result()
         if ws_sockets:
             ws_addrs = [sock.getsockname() for sock in ws_sockets]
@@ -235,7 +249,9 @@ class HeadHunter:
                 self.hc_employed = hc_employed
 
             hc_demand = self.headcount - hc_employed
-            if hc_demand > 0:
+            if hc_demand < 0:
+                pass  # TODO reduce employed headcounts gradually
+            elif hc_demand > 0:
                 logger.debug(
                     f"HH calling {hc_demand} workers from {swarm_addr!s}:{swarm_port!s} via {ws_addrs[0]}"
                 )

@@ -62,8 +62,12 @@ export class WSC {
 
     {
 
-      go { # do the negotiation on a separate thread, don't block the forager
-        # from comm with other worksources concurrently
+      go { # do the negotiation on a separate thread, don't block the forager from comm with other worksources concurrently
+
+        # necessary cleanup after it's disconnected anyway
+        defer this.stop()
+
+        # make the connection
         clnt = Client(
           this.forager.negoModu, this.addr,
           init= modu => {
@@ -74,20 +78,18 @@ export class WSC {
         case clnt.addrs() of { addr :>_ }
         -> console.debug<| 'Connected to worksource at: ' ++ addr
         if clnt.eol() is not false then {
-          clnt.join() # this usually throws in this case
-          # still report an error if above line didn't throw
+          clnt.join() # this usually rethrows the causing error, but let's still report an error if it didn't
           error( 'connection to worksource failed' )
         }
 
-        # cleanup anyway the network connection is disconnected
-        clnt.join() @=> this.stop()
+        # wait for explicit disconnection
+        clnt.join()
       }
 
       # register this wsc to the forager
       this.forager.wsd[ this.key() ] = this
 
-    } $=> { exc } -> { # this can catch exceptions occurred synchronously, or
-      # more probably in case here, on the forked negotiating thread
+    } $=> { exc } -> { # this can catch exceptions occurred synchronously, or more probably in case here, asynchronously on the forked negotiating thread
       console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
 
       this.stop() # cleanup on any exception occurred
@@ -145,7 +147,7 @@ export class WSC {
 
     # check unleash heads reserved for this worksource
     ai if this.hcReserved > 0 then {
-      this.forager.hcIdle <- this.hcReserved
+      this.forager.hcBackIdle <- this.hcReserved
       this.hcReserved = 0
     }
     # forget about this worksource
@@ -175,6 +177,7 @@ export class Forager {
     negoModu as this.negoModu = 'swarm/negotiator',
   ) {
     this.headcount >= 1 or error( 'Invalid headcount: ' ++this.headcount )
+    this.hdIdle = this.headcount
 
     # prioritized recent queue for backlog of worksources
     this.wsq = PRQ()
@@ -182,7 +185,7 @@ export class Forager {
     this.wsd = {}
 
     # available headcounts to be offered
-    this.hcIdle = sink
+    this.hcBackIdle = sink
     # stream of `pid:wsc` for ever started worker processes
     this.workerStarted = sink
   }
@@ -211,6 +214,8 @@ export class Forager {
     # such addr objects are non-equal from eachother in object semantics,
     # even from the same advertiser, so we use its repr str as identifier
     wsKey = repr( cfwAddr )
+    console.debug<| ( 'Got call for '++hcPlanned++' worker(s), with currently '
+      ++this.hdIdle++' head(s) idle.')
     ai {
       case this.wsd[ wsKey ] of {
         { _ } -> { pass } # already been worked on TODO update info ?
@@ -245,7 +250,7 @@ export class Forager {
       }
 
       # for each worker process started, wait one exited
-      for (*** _ ) from this.workerStarted
+      for (***) from this.workerStarted
       do case waitAnyWorkerDone() of {( donePid:doneAct:doneDesc )} -> {
         console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
@@ -260,44 +265,44 @@ export class Forager {
     @}
 
     # start out to have the configured total headcount available
-    hcCum = this.headcount nsLastIdle = 0
+    nsLastIdle = 0
     # collect idle heads in a dedicated thread, to not miss any unleash
-    go for hcNewIdle from this.hcIdle do {
+    go for hcNewIdle from this.hcBackIdle do {
       if hcNewIdle < 1 then continue
       nsLastIdle = console.now()
-      hcCum += hcNewIdle
+      ai this.hdIdle += hcNewIdle
     }
     # insert some zero idle counts periodicly, so the check in following loop
     # won't dead wait in case it can only partial fill for a long time
-    go for _ from console.everySeconds( 1 ) do this.hcIdle <- 0
+    go for _ from console.everySeconds( 1 ) do this.hcBackIdle <- 0
 
     # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
       console.debug<| 'Discovered new worksource: ' ++ wsc.addr
 
       # do wait if can not immediately fulfill all the heads
-      if hcCum < this.headcount && hcCum < wsc.hcPlanned
-      then for _ from this.hcIdle
+      if this.hdIdle < this.headcount and this.hdIdle < wsc.hcPlanned
+      then for _ from this.hcBackIdle
       # can fulfill now
-      do ( hcCum >= wsc.hcPlanned || hcCum >= this.headcount )
+      do ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
       # or waited long enough while partial filling is possible
       # TODO make the hardcoded 5 seconds tunable
-      || ( hcCum > 0 && console.now() - nsLastIdle > 5e9 )
+      || ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
       -> { break }
 
       console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
-      ++ hcCum ++ ' heads to offer.'
+      ++ this.hdIdle ++ ' heads to offer.'
 
       # engage with this worksource with as many free heads atm
       # `engage()` should return quickly without waiting for network,
       # network operations are actually forbidden by the intrinsic tx of
       # assignment
-      hcCum -= wsc.engage( hcCum )
+      this.hdIdle -= wsc.engage( this.hdIdle )
     }
 
     # todo this seems unreachable, add shutdown trigger?
     # shutdown forager, mark eos for various event sinks
-    this.hcIdle <-nil
+    this.hcBackIdle <-nil
     this.workerStarted <-nil
   }
 

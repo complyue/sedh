@@ -2,11 +2,11 @@
 {
 
   export generator m_range() {
-    for m from range( 5, 10 ) do yield m
+    for m from 5..10 do yield m
   }
 
   export generator n_range() {
-    for n from range( 3, 8 ) do yield n
+    for n from 3..8 do yield n
   }
 
   export method exclude( m, n ) {

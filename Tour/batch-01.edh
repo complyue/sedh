@@ -55,7 +55,7 @@ import * JOB_WORK_MODU
   # see: `**__exports__` passed to `manageThisWork()` below
 
   export generator m_range() {
-    for m from range( 7, 9 ) do yield m
+    for m from 7..9 do yield m
   }
 
 }

@@ -14,7 +14,7 @@ then error( 'Missing host module: ' ++ __name__ )
 # host artifacts, and is meant to be leveraged by IDE tools (such as els)
 # with source code analysis capabilities, to aid the developers
 
-import ( Peer, **_ ) 'net'
+import ( Peer, ** ) 'net'
 
 
 export {

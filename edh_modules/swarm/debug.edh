@@ -1,4 +1,4 @@
 
-import ( WebRepl, **_ ) 'net/repl'
+import ( WebRepl, ** ) 'net/repl'
 
 export sedhDebug = WebRepl()

@@ -169,8 +169,8 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
         void $
           forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
             \ !result -> atomically $ do
-              !disposals <- readTVar disposalsVar
-              sequence_ $ flip postEvent EdhNil <$> Set.toList disposals
+              !sinks2Dispose <- readTVar disposalsVar
+              sequence_ $ flip postEvent EdhNil <$> Set.toList sinks2Dispose
               void $ tryPutTMVar wkrEoL result
         atomically $ exitEdh ets exit $ EdhObject peerObj
   where

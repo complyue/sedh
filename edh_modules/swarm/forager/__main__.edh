@@ -4,7 +4,7 @@
 # casted (broadcast, multicast, unicast) to the address a
 # sniffer is configured to sniff
 
-import ( Addr, **_ ) 'net'
+import ( Addr, ** ) 'net'
 
 # procedures responding to call-for-workers are defined there
 import * './mgmt'

@@ -9,7 +9,7 @@ import * './symbols'
 # work definition scripts are allowed to change the inferred configuration at
 # 'swarm/ENV', import the module as a reference, to get/set effective artifacts
 # living there
-senv = import (** _ ) 'swarm/ENV'
+senv = import _ 'swarm/ENV'
 
 
 export class HeadHunter {

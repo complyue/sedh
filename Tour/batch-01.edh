@@ -18,7 +18,7 @@ import * 'swarm'
 # work definition scripts are allowed to change the inferred configuration at
 # 'swarm/ENV', import the module as a reference, to get/set effective artifacts
 # living there
-senv = { import (** _ ) 'swarm/ENV' }
+senv = { import _ 'swarm/ENV' }
 
 # we use this work definition module
 JOB_WORK_MODU = 'swarm/demo/batch'

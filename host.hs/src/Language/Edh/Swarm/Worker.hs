@@ -6,15 +6,13 @@ import Control.Concurrent (forkFinally, forkIO, threadDelay)
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import qualified Data.HashSet as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Language.Edh.EHI
 import Language.Edh.Net
 import Network.Socket
 import Network.Socket.ByteString
-  ( recv,
-    sendAll,
-  )
 import System.Posix
 import Prelude
 
@@ -151,6 +149,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
     let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
     !pktSink <- newEmptyTMVar
     !poq <- newEmptyTMVar
+    !disposalsVar <- newTVar mempty
     !chdVar <- newTVar mempty
     !wkrEoL <- newEmptyTMVar
     let !peer =
@@ -160,6 +159,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
               edh'peer'eol = wkrEoL,
               edh'peer'posting = putTMVar poq,
               edh'peer'hosting = takeTMVar pktSink,
+              edh'peer'disposals = disposalsVar,
               edh'peer'channels = chdVar
             }
     !peerObj <- edhCreateHostObj peerClass peer
@@ -168,9 +168,10 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
       edhContIO $ do
         void $
           forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
-            atomically
-              . void
-              . tryPutTMVar wkrEoL
+            \ !result -> atomically $ do
+              !disposals <- readTVar disposalsVar
+              sequence_ $ flip postEvent EdhNil <$> Set.toList disposals
+              void $ tryPutTMVar wkrEoL result
         atomically $ exitEdh ets exit $ EdhObject peerObj
   where
     !ctx = edh'context ets

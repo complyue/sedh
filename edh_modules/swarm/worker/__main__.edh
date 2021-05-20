@@ -36,7 +36,7 @@ import * workDefinition
 
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for ips from ( outlet=jobSink ) | () =>* {
+go for ips from (outlet= jobSink )|() =>* {
   # identify this connection as swarm worker to the headhunter, then it will
   # start sending ips to our data channel
   peer.postCommand( expr

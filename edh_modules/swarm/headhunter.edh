@@ -211,7 +211,7 @@ export class HeadHunter {
       break # terminate this thread
     }
     # submit ips and process result
-    for result from ( outlet=jobSink ) | producer submitJob( outlet ) {
+    for result from (outlet= jobSink )|() =>* {
       worker.peer.p2c( dataChan, repr( ips ) )
     } do {
       this.resultSink <- ( ips, result )

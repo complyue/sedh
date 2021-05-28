@@ -12,7 +12,7 @@ import * './mgmt'
 
 # the managing forager instance
 # this is normally implanted by host module initialization
-forager ?= Forager()
+forager =: Forager()
 
 
 # start the forager's scheduling work

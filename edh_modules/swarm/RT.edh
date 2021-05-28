@@ -19,23 +19,23 @@ import ( Peer, ** ) 'net'
 
 export {
 
-  killWorker :: ( pid!int!DecimalType ) -> nil
+  killWorker :: ( pid!int!Decimal ) -> nil
   {##
    # Kill a worker process by pid
    #}
   method killWorker( workerPid ) pass
 
 
-  wscTake :: ( fd!int!DecimalType ) -> Peer
+  wscTake :: ( fd!int!Decimal ) -> Peer
   {##
    # Take a work-source connection by file-descriptor number
    #}
   method wscTake( wscFd ) pass
 
   waitAnyWorkerDone :: ()
-  -> pid!int!DecimalType:eg!'exited'
-  || pid!int!DecimalType:eg!'killed by <signal> with(out) core dumped'
-  || pid!int!DecimalType:eg!'stopped by <signal>'
+  -> pid!int!Decimal:eg!'exited'
+  || pid!int!Decimal:eg!'killed by <signal> with(out) core dumped'
+  || pid!int!Decimal:eg!'stopped by <signal>'
   {##
    # Wait for next worker process done
    #
@@ -45,10 +45,10 @@ export {
 
   wscStartWorker :: (
     Addr,
-    dir!path!StringType,
-    cmdl! StringType||ArgsPackType||ListType,
-    module'name!StringType,
-  ) -> pid!int!DecimalType
+    dir!path!String,
+    cmdl! String||ArgsPack||List,
+    module'name!String,
+  ) -> pid!int!Decimal
   {##
    # Start a worker subprocess
    #}

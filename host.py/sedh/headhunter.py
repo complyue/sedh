@@ -41,12 +41,14 @@ class Worker:
         "peer",
         "pid",
         "manager",
+        "_jobs_quota_left",
     )
 
     def __init__(self, peer: Peer, pid: int, forager_pid: int):
         self.peer = peer
         self.pid = pid
         self.manager = forager_pid
+        self._jobs_quota_left = 10  # TODO out as a param
 
         err_sink = peer.armed_channel(ERR_CHAN)
         # convert disconnection without result to error
@@ -61,6 +63,13 @@ class Worker:
             )
 
         peer.eol.add_done_callback(worker_disconn)
+
+    def check_jobs_quota(self):
+        self._jobs_quota_left -= 1
+        if self._jobs_quota_left <= 0:
+            self.peer.stop()
+            return False
+        return True
 
     def __repr__(self):
         return f"<Worker pid={self.pid} via {self.peer.ident}>"
@@ -282,7 +291,8 @@ WorkToDo(
         async def wait_result():
             async for result in job_sink.run_producer(peer.p2c(DATA_CHAN, repr(ips))):
                 self.result_sink.publish((ips, result))
-                self.idle_workers.append(worker)
+                if worker.check_jobs_quota():
+                    self.idle_workers.append(worker)
                 self.worker_available.set()
                 break  # one ips at a time
 
@@ -340,6 +350,10 @@ WorkToDo(
                 if self.idle_workers:
                     worker = self.idle_workers.pop()
                     logger.debug(f"Job assigned to {worker} - {ips}")
+                    
+                    worker_ip = eval(worker.peer.ident)[0]
+                    ips["worker_ip"] = worker_ip
+                    logger.debug(f"worker IP:  {worker_ip}")
 
                     track_task = asyncio.create_task(self.track_job(worker, ips))
 

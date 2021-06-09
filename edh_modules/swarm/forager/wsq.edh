@@ -93,7 +93,7 @@ export class PRQ {
         # found the insert position for this priority
         if priority > p then {
           crq = CRQ( this )
-          this.pv = higher >> ( ( priority, crq ) :> lower )
+          this.pv = higher /> ( ( priority, crq ) :> lower )
           return crq
         }
         # priority is lower
@@ -102,7 +102,7 @@ export class PRQ {
       }
       # create a crq with lowest priority
       crq = CRQ( this )
-      this.pv = higher >> ( ( priority, crq ) :> lower )
+      this.pv = higher /> ( ( priority, crq ) :> lower )
       return crq
     }
   }

@@ -67,7 +67,7 @@ installSwarmBatteries
 
               !moduArts <-
                 sequence $
-                  [ (nm,) <$> mkHostProc moduScope mc nm hp
+                  [ (AttrByName nm,) <$> mkHostProc moduScope mc nm hp
                     | (nm, mc, hp) <-
                         [ ( "killWorker",
                             EdhMethod,
@@ -88,13 +88,9 @@ installSwarmBatteries
                         ]
                   ]
 
-              !artsDict <-
-                EdhDict
-                  <$> createEdhDict
-                    [(EdhString k, v) | (k, v) <- moduArts]
-              flip iopdUpdate (edh'scope'entity moduScope) $
-                [(AttrByName k, v) | (k, v) <- moduArts]
-                  ++ [(AttrByName "__exports__", artsDict)]
+              iopdUpdate moduArts $ edh'scope'entity moduScope
+              prepareExpStore ets (edh'scope'this moduScope) $ \ !esExps ->
+                iopdUpdate moduArts esExps
 
               exit
 

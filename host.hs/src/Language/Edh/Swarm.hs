@@ -1,23 +1,15 @@
-module Language.Edh.Swarm
-  ( installSwarmBatteries,
-    startSwarmWork,
-    SwarmWorkStarter (..),
-    determineSwarmWorkStarter,
-  )
-where
+module Language.Edh.Swarm where
 
 -- import           Debug.Trace
 
-import Control.Concurrent (forkFinally)
-import Control.Exception (SomeException)
 import Control.Monad.Reader
 import qualified Data.Text as T
 import Language.Edh.EHI
 import Language.Edh.Net
 import Language.Edh.Repl
+import Language.Edh.Run
 import Language.Edh.Swarm.Starter
 import Language.Edh.Swarm.Worker
-import System.IO (hPutStrLn, stderr)
 import Prelude
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
@@ -112,81 +104,24 @@ startSwarmWork !worldCustomization = do
         ">> Get Work Done - by a swarm <<\n"
           <> "* Blank Screen Syndrome ? Take the Tour as your companion, checkout:\n"
           <> "  https://github.com/e-wrks/tour\n"
-    else do
-      !console <- defaultEdhConsole defaultEdhConsoleSettings
-      let consoleOut = consoleIO console . ConsoleOut
-          consoleShutdown = consoleIO console ConsoleShutdown
-
-          workProg :: IO ()
-          workProg = do
-            -- create the world, we always work with this world no matter how
-            -- many times the Edh programs crash
-            !world <- createEdhWorld console
+    else case workSpec of
+      -- run in headhunter mode
+      !workScript | wscFd == 0 ->
+        edhRunFile defaultEdhConsoleSettings (T.unpack workScript) $
+          \ !world -> do
             initWorld world
-
-            case workSpec of
-              -- run in headhunter mode
-              !workScript
-                | wscFd == 0 ->
-                  runEdhFile world (T.unpack workScript) >>= \case
-                    Left !err -> do
-                      -- program crash on error
-                      consoleOut "Swarm headhunter crashed with an error:\n"
-                      consoleOut $ T.pack $ show err <> "\n"
-                    Right !phv -> case edhUltimate phv of
-                      EdhNil ->
-                        -- clean program halt, all done
-                        consoleOut $
-                          "Swarm work script " <> workScript <> " done right.\n"
-                      _ -> do
-                        -- unclean program exit
-                        consoleOut "Swarm headhunter halted with a result:\n"
-                        consoleOut $
-                          (<> "\n") $ case phv of
-                            EdhString msg -> msg
-                            _ -> T.pack $ show phv
-
-              -- run in swarm worker mode
-              _workModu ->
-                runEdhModule world "swarm/worker" edhModuleAsIs >>= \case
-                  Left !err -> do
-                    -- program crash on error
-                    consoleOut "Swarm worker crashed with an error:\n"
-                    consoleOut $ T.pack $ show err <> "\n"
-                  Right !phv -> case edhUltimate phv of
-                    -- clean program halt, all done
-                    EdhNil -> consoleOut "Swarm worker right retired.\n"
-                    -- unclean program exit
-                    _ -> do
-                      consoleOut "Swarm worker halted with a result:\n"
-                      consoleOut $
-                        (<> "\n") $ case phv of
-                          EdhString msg -> msg
-                          _ -> T.pack $ show phv
-
-            consoleShutdown
-
-      void $
-        forkFinally workProg $ \result -> do
-          case result of
-            Left (e :: SomeException) ->
-              hPutStrLn stderr $ "💥 " <> show e
-            Right _ -> pure ()
-          -- shutdown console IO anyway
-          consoleIO console ConsoleShutdown
-
-      case workSpec of
-        -- run in headhunter mode
-        !workScript
-          | wscFd == 0 ->
+            let !consoleOut = consoleIO (edh'world'console world) . ConsoleOut
             consoleOut $
               ">> Hunting working heads for "
                 <> workScript
                 <> " from swarm, HH pid="
                 <> T.pack (show managerPid)
                 <> " <<\n"
-        -- run in swarm worker mode
-        !workModu ->
+      -- run in swarm worker mode
+      !workModu ->
+        edhRunModule defaultEdhConsoleSettings "swarm/worker" $ \ !world -> do
+          initWorld world
+          let !consoleOut = consoleIO (edh'world'console world) . ConsoleOut
           consoleOut $
             ">> Working out "
               <> workModu
@@ -195,5 +130,3 @@ startSwarmWork !worldCustomization = do
               <> " forager pid="
               <> T.pack (show managerPid)
               <> " <<\n"
-
-      consoleIOLoop console

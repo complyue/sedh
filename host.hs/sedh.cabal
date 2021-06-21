@@ -106,8 +106,8 @@ executable forage
 library
   exposed-modules:
     Language.Edh.Swarm
-  other-modules:
     Language.Edh.Swarm.Starter
+  other-modules:
     Language.Edh.Swarm.Worker
 
   hs-source-dirs:     src

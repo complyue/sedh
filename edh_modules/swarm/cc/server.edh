@@ -1,0 +1,64 @@
+import * 'net'
+
+import * './debug'
+
+
+export class SwarmController {
+
+  # a stack of overlayed edh modules providing web resources
+  WEB_MODULES = (
+    'swarm/web', # from sedh
+    'net/web', # from nedh
+    'web', # from edh
+  )
+
+  # extra routes by url
+  URL_ROUTES = {}
+
+
+  # constructor
+  method __init__(
+    httpPort= 6780,
+    addr= '0.0.0.0',
+  ) {
+
+    this.http = HttpServer(
+      that.WEB_MODULES,
+      addr= addr, port= httpPort, routes= {
+        'pixie': () => { # TODO load from etc files
+          perform setContentType$ "text/json"
+          perform writeText$ json$ {
+            "kernel": "file:///cnroot/boot/kernel",
+            "initrd": [
+              "file:///cnroot/boot/initrd",
+            ],
+            "cmdline": ' '.join(
+              "root=/dev/nfs",
+              "nfsroot=10.88.88.139:/cnroot,ro,noacl",
+              "ip=::::::dhcp",
+              # "single", # for rescue
+            ),
+          }
+        },
+      } =< that.URL_ROUTES,
+    )
+    case this.http.addrs() of {
+      { httpAddr :> _extraHttpAddrs } -> {
+        console.info<| 'Swarm Control Center listening: http://'
+        ++ httpAddr.host() ++ ':' ++ httpAddr.port()
+      }
+      error( 'Swarm Control Center failed start serving.' )
+    }
+
+  }
+
+
+  method join() {
+    this.http.join()
+  }
+
+  method stop() {
+    this.http.stop()
+  }
+
+}

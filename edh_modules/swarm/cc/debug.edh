@@ -1,0 +1,7 @@
+
+import * 'net/repl'
+
+{##
+ # the shared `WebRepl` instance for debugging of Swarm Control Center
+ #}
+export sccDebug = WebRepl()

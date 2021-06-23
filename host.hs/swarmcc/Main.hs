@@ -1,0 +1,15 @@
+module Main where
+
+-- import           Debug.Trace
+
+import Language.Edh.EHI
+import Language.Edh.Net
+import Language.Edh.Run
+import Prelude
+
+main :: IO ()
+main = edhRunModule defaultEdhConsoleSettings "swarm/cc" $
+  \ !world -> do
+    -- install all necessary batteries
+    installEdhBatteries world
+    installNetBatteries world

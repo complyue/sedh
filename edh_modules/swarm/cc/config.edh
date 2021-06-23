@@ -1,0 +1,8 @@
+{##
+ # this module is defined so the configuration is customizable with a nested
+ # .edh file in edh_modules besides cwd of a tool
+ #}
+export {
+  httpPort = 6780
+  addr = '0.0.0.0'
+}

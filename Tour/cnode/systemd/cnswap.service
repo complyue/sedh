@@ -1,0 +1,16 @@
+
+[Unit]
+Description=Compute Node swap Setup
+Requires=cnswap.mount
+
+[Service]
+Type=oneshot
+WorkingDirectory=/cnswap
+ExecStart=/cnswap/sbin/cn-set-swap.sh
+RemainAfterExit=true
+ExecStop=/cnswap/sbin/cn-unset-swap.sh
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Transient log fs
+After=var.mount
+Before=syslogd.service rsyslogd.service
+
+[Mount]
+Where=/var/log
+What=tmpfs
+Type=tmpfs
+Options=size=512M
+
+[Install]
+WantedBy=multi-user.target

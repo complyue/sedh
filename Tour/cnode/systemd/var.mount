@@ -1,0 +1,13 @@
+[Unit]
+Description=Compute Node's var fs over NFS
+After=network.target
+Before=var-log.mount
+
+[Mount]
+What=10.88.88.139:/cnvar
+Where=/var
+Type=nfs
+Options=rw,vers=3,noacl,nolock
+
+[Install]
+WantedBy=multi-user.target

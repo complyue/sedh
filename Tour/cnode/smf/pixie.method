@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+
+ctrun -l child -o noorphan /root/go/bin/pixiecore $* &

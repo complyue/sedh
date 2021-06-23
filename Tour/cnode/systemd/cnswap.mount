@@ -1,0 +1,12 @@
+[Unit]
+Description=Compute Node swap Root
+After=network.target
+
+[Mount]
+What=10.88.88.139:/cnswap
+Where=/cnswap
+Type=nfs
+Options=rw,vers=3,noacl,nolock
+
+[Install]
+WantedBy=multi-user.target

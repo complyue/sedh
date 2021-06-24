@@ -25,7 +25,8 @@ export class SwarmController {
     this.http = HttpServer(
       that.WEB_MODULES,
       addr= addr, port= httpPort, routes= {
-        'pixie': () => { # TODO load from etc files
+        'pixie/v1/boot/:mac': () => { # TODO load from etc files
+          let (mac, **) = perform rqParams
           perform setContentType$ "text/json"
           perform writeText$ json$ {
             "kernel": "file:///cnroot/boot/kernel",

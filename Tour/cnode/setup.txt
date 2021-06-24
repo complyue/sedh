@@ -101,8 +101,9 @@ ln -s /run/lock /run/cnroot/var/lock
 rm /cnroot/etc/fstab
 vi /cnroot/etc/fstab
 # add these lines
-10.88.88.139:/cnroot  /         nfs     ro,vers=3,noacl,nolock  0 0
-tmpfs                 /tmp      tmpfs   defaults,size=2G        0 0
+10.88.88.139:/cnroot  /          nfs     ro,vers=3,noacl,nolock  0 0
+tmpfs                 /tmp       tmpfs   defaults,size=2G        0 0
+10.88.88.139:/cnwkspc /workspace nfs     rw,vers=3,noacl,nolock  0 0
 
 # prepare netboot initramfs
 cd /run/cnroot/boot

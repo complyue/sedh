@@ -27,7 +27,9 @@ class Forager:
     )
 
     def __init__(
-        self, peer: Peer, pid: int,
+        self,
+        peer: Peer,
+        pid: int,
     ):
         self.peer = peer
         self.pid = pid
@@ -82,7 +84,9 @@ class HeadHunter:
     """
 
     def __init__(
-        self, result_sink: EventSink = None, server_modu: str = "sedh.hh",
+        self,
+        result_sink: EventSink = None,
+        server_modu: str = "sedh.hh",
     ):
         loop = asyncio.get_running_loop()
 
@@ -190,11 +194,7 @@ class HeadHunter:
     async def _run(self):
         loop = asyncio.get_running_loop()
 
-        swarm_iface = "0.0.0.0"
-        try:
-            swarm_iface = effect("swarmIface")
-        except:
-            pass
+        swarm_iface = effect("swarmIface", "0.0.0.0")
 
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
@@ -217,15 +217,8 @@ class HeadHunter:
             # in case join() didn't throw, report this error
             raise RuntimeError("HeadHunter failed listening.")
 
-        swarm_addr, swarm_port = "127.0.0.1", 3722
-        try:
-            swarm_addr = effect("swarmAddr")
-        except:
-            pass
-        try:
-            swarm_port = effect("swarmPort")
-        except:
-            pass
+        swarm_addr = effect("swarmAddr", "127.0.0.1")
+        swarm_port = effect("swarmPort", 3722)
 
         # todo release cfw on cleanup.
         # but not urgent as long as HH runs in one-shot manner, the process is
@@ -238,11 +231,7 @@ class HeadHunter:
             allow_broadcast=True,
         )
 
-        cfw_interval = 3
-        try:
-            cfw_interval = effect("cfw_interval")
-        except:
-            pass
+        cfw_interval = effect("cfw_interval", 3)
 
         while not self.all_finished():
 
@@ -299,7 +288,8 @@ WorkToDo(
         wait_task = asyncio.create_task(wait_result())
         # submit ips and process result
         await asyncio.wait(
-            [wait_task, err_task], return_when=asyncio.FIRST_COMPLETED,
+            [wait_task, err_task],
+            return_when=asyncio.FIRST_COMPLETED,
         )
         # anyway it's not pending now
         self.pending_cntr -= 1
@@ -350,7 +340,7 @@ WorkToDo(
                 if self.idle_workers:
                     worker = self.idle_workers.pop()
                     logger.debug(f"Job assigned to {worker} - {ips}")
-                    
+
                     worker_ip = eval(worker.peer.ident)[0]
                     ips["worker_ip"] = worker_ip
                     logger.debug(f"worker IP:  {worker_ip}")
@@ -416,4 +406,3 @@ class WorkAnnouncingProtocol(asyncio.DatagramProtocol):
 
     def connection_lost(self, exc):
         pass
-

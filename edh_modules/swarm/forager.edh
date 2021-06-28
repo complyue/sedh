@@ -6,7 +6,7 @@
 import * 'net'
 
 # will use classes there, but not to re-rexport them
-import * 'swarm/forager/mgmt'
+import * './forager/mgmt'
 
 
 export method forageOn (
@@ -14,44 +14,38 @@ export method forageOn (
   targetPrefix = '', # prefix to filter out uninteresting work
   swarmAddr = '0.0.0.0', # local addr to sniff for call-for-workers
   swarmPort = 3722, # local port to sniff for call-for-workers
-  foragerModu = 'swarm/forager', # the forager reacting module
 ) {
 
-  # artifacts should be implanted into the cfw facing module
-  namespace cfw'arts () export {
+  # the forager instance
+  forager = Forager( headcount )
 
-    # the forager instance
-    forager = Forager( headcount )
+  let sniffer = Sniffer( addr= swarmAddr, port= swarmPort, ) $@ () => {
 
-    # re-export (as to expose) forager's reacting (exported) methods there,
-    # as to be callable by sniffed commands
-    import * forager
+    # start the forager's scheduling work
+    go forager.scheduleTeams()
 
-  }
+    # re-export (as to expose) forager's reacting (exported) methods there, as to be callable by sniffed commands
+    from forager import * into perform svcScope
 
-  # effects should be implanted into the cfw facing module
-  namespace cfw'effs () export {
-
-    method ignoreWorkModu( workModu ) case workModu of {
+    # impl. work filtering
+    effect method ignoreWorkModu( workModu ) case workModu of {
       { targetPrefix >@ _ } -> false
       _ -> true
     }
 
-  }
+    # loop forever until eol on error, or stopped elsewhere
+    while perform eol() is false {
 
-  sniffer = Sniffer(
-    # sniffer module
-    foragerModu,
-    # addr/port to sniff on
-    swarmAddr, swarmPort,
-    # sniffer module initializer
-    init= modu => {
-      # implant the forager instance ets.
-      import * cfw'arts into modu
-      # provide effects like filtering etc.
-      effect import * cfw'effs into modu
-    },
-  )
+      # note nil result from `sniff()` is very much expected, and is silently ignored
+      case perform sniff() of { cmdVal } -> {
+        console.info<| 'Unexpected cmd result:\n  ' ++ cmdVal
+      }
+
+    } $=> { exc } -> {
+      console.error<| 'Error sniffing: ' ++ desc( exc )
+    }
+
+  }
 
   case sniffer.addrs() of {
     { addr :>_ } -> console.info<| 'Foraging at: ' ++ addr

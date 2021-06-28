@@ -218,7 +218,7 @@ export class Forager {
       ++this.hdIdle++' head(s) idle.')
     ai {
       case this.wsd[ wsKey ] of {
-        { _ } -> { pass } # already been worked on TODO update info ?
+        { _ } -> pass # already been worked on TODO update info ?
         case this.wsq.iqd[ wsKey ] of {
           { wsc } -> {
             # already in queue, refresh its known states up-to-date

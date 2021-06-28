@@ -47,7 +47,7 @@ export method @doOneJob * {
   # define their own symbols used to identify the expected effects,
   # instead of the alphanumeric name `c` as demonstrated here.
   effect c = m + n
-  case computeIt( m * n ) of { r } -> { pass }
+  case computeIt( m * n ) of { r } -> pass
 
   # simulate computation time cost, each taking 3 seconds.
   # for ts from console.everySeconds( 3 ) do break

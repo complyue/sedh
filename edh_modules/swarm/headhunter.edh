@@ -30,7 +30,7 @@ export class HeadHunter {
       go {
         discExc = None
         this.peer.join() $=> {
-          { discExc } -> { pass }
+          { discExc } -> pass
         }
         errSink <- discExc or PeerError( 'Swarm worker disconnected' )
       }
@@ -64,7 +64,7 @@ export class HeadHunter {
         )
         this.foragers[ peer ] = forager
       }
-      { forager } -> { pass }
+      { forager } -> pass
     }
     forager.hcEmployed += hcToEmploy
     console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
@@ -195,7 +195,7 @@ export class HeadHunter {
 
       # call the effectful failure callback
       case perform @shouldRetryJob of {
-        false -> { pass }
+        false -> pass
         true -> this.pendingJobs.push( ips )
         { retryChk } -> case retryChk( jobExc, ips ) of { newIPS } -> {
           this.pendingJobs.push( newIPS )

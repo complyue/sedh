@@ -1,0 +1,77 @@
+/*
+ * Control Center
+ */
+
+html {
+  background-color: #f7f7f7;
+}
+
+body {
+  margin: 1px;
+  font-size: 100%;
+  padding: 1px 1px 0 21pt;
+  background-color: #f7f7f7;
+}
+
+body p {
+  line-height: 2em;
+}
+
+table {
+  padding: 10pt;
+  min-height: 10pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+tr {
+  display: table-row;
+  padding: 10pt;
+  min-height: 10pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+th {
+  display: table-cell;
+  min-width: 12pt;
+  min-height: 10pt;
+  padding: 6pt;
+  text-align: center;
+  font-size: 12pt;
+  font-weight: bold;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+td {
+  display: table-cell;
+  padding: 6pt;
+  text-align: center;
+  font-size: 12pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+hr {
+  border-color: #ddd;
+}
+
+button {
+  margin: 1px 2px;
+  padding: 2px;
+}
+
+div.ConfigFileEdit {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: stretch;
+}
+
+div.ConfigFileEdit > textarea {
+  overflow: scroll;
+  flex: 1;
+  resize: both;
+
+  background-color: #edf5ea;
+}

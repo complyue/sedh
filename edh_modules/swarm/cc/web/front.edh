@@ -1,0 +1,42 @@
+import * 'net/http'
+
+import * './layout'
+
+
+export method renderPage(
+  title= 'Swarm Control Center',
+) {
+
+  effect {
+
+    title = title
+
+    method head() {
+      fallback head()
+      html.link( rel= 'stylesheet', href= '/cc.css' )$ pass
+    }
+
+    method body'content() {
+
+      html.div(class= 'page_header')$ {
+        html.tag('h3')$ {
+          behave @tag'inner'text$ title
+        }
+      }
+
+      html.section(id= 'cnodes_info')$ {
+        # TODO the dynamic table here
+      }
+
+    }
+
+    method body'end'scripts() {
+      fallback body'end'scripts()
+      html.script(src= '/cc.js') $ pass
+    }
+
+  }
+
+  layoutPage()
+
+}

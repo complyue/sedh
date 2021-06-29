@@ -1,0 +1,44 @@
+import * 'net/http'
+
+
+export method layoutPage() {
+
+  effect default {
+
+    title = '?!?'
+
+    method head() {
+      html.link( rel= 'icon', href= '/icons/favicon.png' )$ pass
+    }
+
+    method body() {
+
+      effect default {
+        method body'begin'scripts() pass
+        method body'content() pass
+        method body'end'scripts() pass
+      }
+
+      perform body'begin'scripts()
+      perform body'content()
+      perform body'end'scripts()
+    }
+
+  }
+
+  html.html()$ {
+
+    html.head() $ {
+      html.title() {
+        perform @tag'inner'text$ perform title
+      }
+      perform head()
+    }
+
+    html.body()$ {
+      perform body()
+    }
+
+  }
+
+}

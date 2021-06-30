@@ -90,7 +90,10 @@ executable forage
     TypeOperators
     ViewPatterns
 
-  ghc-options:        -Wall -threaded -rtsopts "-with-rtsopts=-maxN2 -qg"
+  -- for now use `-N1` to workaround https://github.com/haskell/unix/issues/62
+  -- some equivalence of `getAnyProcessStatus` is absent from package `process`,
+  -- or we should really switch to use `process` instead
+  ghc-options:        -Wall -threaded -rtsopts "-with-rtsopts=-N1 -qg"
   build-depends:
     , base              >=4.12
     , bytestring

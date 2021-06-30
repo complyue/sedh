@@ -12,7 +12,7 @@ export class SwarmController {
     'web', # from edh
   )
 
-  # extra routes by url
+  # extra routes by path in url
   URL_ROUTES = {}
 
 

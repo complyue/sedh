@@ -1,11 +1,7 @@
-
-# this is the entry module of Đ Swarm Control Center
+{## this is the entry module of Đ Swarm Control Center #}
 
 import * 'swarm/cc'
-
-
 import * as cfg 'swarm/cc/config'
-
 
 scc = SwarmController(**cfg)
 scc.join()

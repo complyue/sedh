@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
 import subprocess, re, socket, json, sys
+import datetime, psutil
+
+
+ts = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
+mem = psutil.virtual_memory()
+swap = psutil.swap_memory()
+cpu_percents = psutil.cpu_percent(interval=3, percpu=True)
 
 
 addr, port = "255.255.255.255", 6768
@@ -40,6 +47,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
                 {
                     "mac": mac,
                     "ip": ip,
+                    "heartbeat": {
+                        "timestamp": ts,
+                        "mem": {f: getattr(mem, f) for f in mem._fields},
+                        "swap": {f: getattr(swap, f) for f in swap._fields},
+                        "cpu_percents": cpu_percents,
+                    },
                 }
             )
 

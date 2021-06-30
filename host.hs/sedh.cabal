@@ -144,6 +144,7 @@ executable swarmcc
 library
   exposed-modules:
     Language.Edh.Swarm
+    Language.Edh.Swarm.NodeCfg
     Language.Edh.Swarm.Starter
   other-modules:
     Language.Edh.Swarm.Worker
@@ -176,6 +177,7 @@ library
     , containers
     , directory
     , edh
+    , filepath
     , hashable
     , lossless-decimal
     , mtl

@@ -8,6 +8,7 @@ import Language.Edh.EHI
 import Language.Edh.Net
 import Language.Edh.Repl
 import Language.Edh.Run
+import Language.Edh.Swarm.NodeCfg
 import Language.Edh.Swarm.Starter
 import Language.Edh.Swarm.Worker
 import Prelude
@@ -49,7 +50,7 @@ installSwarmBatteries
             withPeerClass $ \ !peerClass _ets -> do
               let !moduScope = contextScope $ edh'context ets
 
-              !moduArts <-
+              !moduArts0 <-
                 sequence $
                   [ (AttrByName nm,) <$> mkHostProc moduScope mc nm hp
                     | (nm, mc, hp) <-
@@ -71,6 +72,9 @@ installSwarmBatteries
                           )
                         ]
                   ]
+              !nregClass <- createNodeRegClass moduScope
+              let moduArts =
+                    (AttrByName "NodeReg", EdhObject nregClass) : moduArts0
 
               iopdUpdate moduArts $ edh'scope'entity moduScope
               prepareExpStore ets (edh'scope'this moduScope) $ \ !esExps ->

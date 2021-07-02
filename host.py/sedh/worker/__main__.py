@@ -14,6 +14,8 @@ import sedh.senv
 
 logger = sedh.log.get_logger(__package__)
 
+dump_stacks_on_SIGQUIT()
+
 
 async def _run_():
     loop = asyncio.get_running_loop()
@@ -27,7 +29,10 @@ async def _run_():
     effect_import(nedh.effects)
 
     effect(
-        {netPeer: peer, dataSink: peer.ensure_channel(DATA_CHAN),}
+        {
+            netPeer: peer,
+            dataSink: peer.ensure_channel(DATA_CHAN),
+        }
     )
 
     # import the work definition module
@@ -109,4 +114,3 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
 
 
 asyncio.run(_run_())
-

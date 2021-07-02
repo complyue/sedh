@@ -1,5 +1,7 @@
 import * 'net'
 
+import (NodeReg, **) 'swarm/CTRL'
+
 import * './debug'
 
 
@@ -19,8 +21,47 @@ export class SwarmController {
   # constructor
   method __init__(
     httpPort= 6780,
+    regDir= './etc',
     addr= '0.0.0.0',
   ) {
+
+    this.nreg = NodeReg((expr {
+          # list useful fields as metadata
+          swarm = 'cn'
+          user = 'dw'
+
+          # this is always implanted automatically
+          # note: use (=:) to just prototype it, but never overwrite it!
+          mac =: '00:00:00:00:00:00'
+
+          # these should be continuously updated by heartbeats from the booted node
+          # note: use (?=) to supply initial values, but never overwrite existing ones!
+          ip ?= 'N/A'
+          timestamp ?= 'N/A'
+          vmem ?= {total: 0, available: 0, active: 0, inactive: 0, wired: 0,}
+          swap ?= {total: 0, used: 0, free: 0,}
+          cpufreq ?= {current: 0, min: 0, max: 0,}
+          cpuload ?= [0, 0,] # utilized percents of each virtual one
+          nps ?= 0 # number of processes
+
+          # provide clickable link on the browser for login to this node
+          method login_link() {
+            return 'ssh://'++ user ++'@' ++ ip
+          }
+
+          # make it bootable or not, from certain nfs server
+          bootable = true
+          nfs_server = '10.88.88.139'
+          if bootable then perform boot(
+            kernel= "file:///"++ swarm ++"root/boot/kernel",
+            initrd= [ "file:///"++ swarm ++"root/boot/initrd", ],
+            cmdline= ' '.join(
+              "root=/dev/nfs",
+              "nfsroot="++ nfs_server ++":/"++ swarm ++"root,ro,noacl",
+              "ip=dhcp",
+            )
+          )
+    }).deBlock, regDir= regDir,)
 
     this.http = HttpServer(
       that.WEB_MODULES,
@@ -36,7 +77,7 @@ export class SwarmController {
             "cmdline": ' '.join(
               "root=/dev/nfs",
               "nfsroot=10.88.88.139:/cnroot,ro,noacl",
-              "ip=::::::dhcp",
+              "ip=dhcp",
               # "single", # for rescue
             ),
           }

@@ -13,6 +13,19 @@ import Language.Edh.Swarm.Starter
 import Language.Edh.Swarm.Worker
 import Prelude
 
+installSwarmCtrlBatteries :: EdhWorld -> IO ()
+installSwarmCtrlBatteries !world = do
+  void $
+    installEdhModule world "swarm/CTRL" $ \ !ets !exit -> do
+      let !moduScope = contextScope $ edh'context ets
+      !nregClass <- createNodeRegClass moduScope
+      let !moduArts = [(AttrByName "NodeReg", EdhObject nregClass)]
+
+      iopdUpdate moduArts $ edh'scope'entity moduScope
+      prepareExpStore ets (edh'scope'this moduScope) $ \ !esExps ->
+        iopdUpdate moduArts esExps
+      exit
+
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
 installSwarmBatteries
   ( SwarmWorkStarter
@@ -50,7 +63,7 @@ installSwarmBatteries
             withPeerClass $ \ !peerClass _ets -> do
               let !moduScope = contextScope $ edh'context ets
 
-              !moduArts0 <-
+              !moduArts <-
                 sequence $
                   [ (AttrByName nm,) <$> mkHostProc moduScope mc nm hp
                     | (nm, mc, hp) <-
@@ -72,9 +85,6 @@ installSwarmBatteries
                           )
                         ]
                   ]
-              !nregClass <- createNodeRegClass moduScope
-              let moduArts =
-                    (AttrByName "NodeReg", EdhObject nregClass) : moduArts0
 
               iopdUpdate moduArts $ edh'scope'entity moduScope
               prepareExpStore ets (edh'scope'this moduScope) $ \ !esExps ->

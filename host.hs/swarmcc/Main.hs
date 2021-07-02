@@ -5,6 +5,7 @@ module Main where
 import Language.Edh.EHI
 import Language.Edh.Net
 import Language.Edh.Run
+import Language.Edh.Swarm
 import Prelude
 
 main :: IO ()
@@ -13,3 +14,4 @@ main = edhRunModule defaultEdhConsoleSettings "swarm/cc" $
     -- install all necessary batteries
     installEdhBatteries world
     installNetBatteries world
+    installSwarmCtrlBatteries world

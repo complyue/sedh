@@ -116,6 +116,11 @@ createNodeRegClass !clsOuterScope =
                 !tsFile <- modificationTime <$> getFileStatus pfp
                 -- load into a new attrs sandbox
                 !attrs <- atomically createSandbox
+                atomically $
+                  iopdInsert
+                    (AttrByName "mac")
+                    (EdhString mac)
+                    (edh'scope'entity attrs)
                 !boot <- loadNodeCfg world srcName src attrs
                 -- record & return to Edh
                 atomically $ do
@@ -132,6 +137,11 @@ createNodeRegClass !clsOuterScope =
                   !attrs <- case cfgLoaded of
                     Nothing -> atomically createSandbox
                     Just !ncfg -> return $ node'cfg'attrs ncfg
+                  atomically $
+                    iopdInsert
+                      (AttrByName "mac")
+                      (EdhString mac)
+                      (edh'scope'entity attrs)
                   !boot <- loadNodeCfg world srcName src attrs
                   -- record & return to Edh
                   atomically $ do

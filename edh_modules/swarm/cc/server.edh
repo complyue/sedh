@@ -1,8 +1,11 @@
 import * 'net'
+import * 'net/http'
 
 import (NodeReg, **) 'swarm/CTRL'
 
 import * './debug'
+
+import ( renderPage as frontPage, ** ) './web/front'
 
 
 export class SwarmController {
@@ -74,6 +77,13 @@ export class SwarmController {
       that.WEB_MODULES,
       addr= httpInterface, port= httpPort, routes= {
         'pixie/v1/boot/:mac': that.pixieApi,
+        '': () => {
+          perform setContentType('text/html')
+          effect method @ht'write'payload(chunk) {
+            perform writeText$ str$ chunk
+          }
+          runTag$ frontPage$ this.nreg.knownNodes
+        },
       } =< that.URL_ROUTES,
     )
     case this.http.addrs() of {

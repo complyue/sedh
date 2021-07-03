@@ -52,6 +52,21 @@ A new configuration file will be written with content from `cfgDefault`, if not 
 
     )
 
+    {## List all known nodes
+
+Only nodes ever triggered `cfgOf()` will be enumerated
+
+They are usually triggered by either dhcp booting or heartbeating
+
+     #}
+    generator knownNodes() {
+      yield (
+        src =: 'cfg stmts',
+        attrs =: scope(),
+      )
+      # multiple records to be yielded ...
+    }
+
   }
 
 }

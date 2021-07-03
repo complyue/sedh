@@ -4,6 +4,7 @@ import * './layout'
 
 
 export method renderPage(
+  knownNodes,
   title= 'Swarm Control Center',
 ) {
 
@@ -25,7 +26,20 @@ export method renderPage(
       }
 
       html.section(id= 'cnodes_info')$ {
-        # TODO the dynamic table here
+
+        html.tag('table')$ {
+          html.tag('thead')$ html.tag('tr')$ {
+
+            # TODO th cells here
+
+          }
+          html.tag('tbody')$ do html.tag('tr')$ {
+
+            # TODO td cells here
+
+          } for@ ( cfgSrc, cfgAttrs, ** ) from knownNodes()
+        }
+
       }
 
     }

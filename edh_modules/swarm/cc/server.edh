@@ -7,81 +7,73 @@ import * './debug'
 
 export class SwarmController {
 
-  # a stack of overlayed edh modules providing web resources
+  {## a stack of Đ modules, overlaid in providing files as static web resources #}
   WEB_MODULES = (
     'swarm/web', # from sedh
     'net/web', # from nedh
     'web', # from edh
   )
 
-  # extra routes by path in url
+  {## extra routes per HttpServer (atop Snap) semantics #}
   URL_ROUTES = {}
+
+  {## computing node configuration template
+   # serving as default when a new unknown computing node attempts booting #}
+  CNODE_CFG_TMPL = expr {
+    # ctrl fields as well as metadata
+    swarm = 'cn'
+    user = 'dw'
+
+    # this is always implanted automatically
+    # note: use (=:) to just prototype it, but never overwrite it!
+    mac =: '00:00:00:00:00:00'
+
+    # these should be continuously updated by heartbeats from the booted node
+    # note: use (?=) to supply initial values, but never overwrite existing ones!
+    timestamp ?= None
+    ip ?= None
+    vmem ?= {"total": 0, "available": 0, "active": 0, "inactive": 0, }
+    swap ?= {"total": 0, "used": 0, "free": 0,}
+    cpufreq ?= {"current": 0, "min": 0, "max": 0,}
+    cpuload ?= [0, 0,] # utilized percents of each virtual one
+    nps ?= 0 # number of processes
+
+    # provide clickable link to show on the browser for login to this node
+    method login_link() {
+      null(ip) -> 'javascript:alert("Compute node ['++ mac ++'] not booted!")'
+      'ssh://' ++ user ++ '@' ++ ip
+    }
+
+    # make it bootable or not, mounting root fs from certain nfs server
+    bootable = true
+    nfs_server = '10.88.88.139'
+    if bootable then perform boot(
+      kernel= "file:///"++ swarm ++"root/boot/kernel",
+      initrd= [ "file:///"++ swarm ++"root/boot/initrd", ],
+      cmdline= ' '.join(
+        "root=/dev/nfs",
+        "nfsroot="++ nfs_server ++":/"++ swarm ++"root,ro,noacl",
+        "ip=dhcp",
+      )
+    )
+  }
 
 
   # constructor
   method __init__(
-    httpPort= 6780,
     regDir= './etc',
-    addr= '0.0.0.0',
+    httpPort= 6780, httpInterface= '0.0.0.0',
+    hbPort= 6768, hbInterface = '0.0.0.0',
   ) {
 
-    this.nreg = NodeReg((expr {
-          # list useful fields as metadata
-          swarm = 'cn'
-          user = 'dw'
+    {## Registry of all nodes #}
+    this.nreg = NodeReg( that.CNODE_CFG_TMPL.deBlock, regDir= regDir, )
 
-          # this is always implanted automatically
-          # note: use (=:) to just prototype it, but never overwrite it!
-          mac =: '00:00:00:00:00:00'
-
-          # these should be continuously updated by heartbeats from the booted node
-          # note: use (?=) to supply initial values, but never overwrite existing ones!
-          ip ?= 'N/A'
-          timestamp ?= 'N/A'
-          vmem ?= {total: 0, available: 0, active: 0, inactive: 0, wired: 0,}
-          swap ?= {total: 0, used: 0, free: 0,}
-          cpufreq ?= {current: 0, min: 0, max: 0,}
-          cpuload ?= [0, 0,] # utilized percents of each virtual one
-          nps ?= 0 # number of processes
-
-          # provide clickable link on the browser for login to this node
-          method login_link() {
-            return 'ssh://'++ user ++'@' ++ ip
-          }
-
-          # make it bootable or not, from certain nfs server
-          bootable = true
-          nfs_server = '10.88.88.139'
-          if bootable then perform boot(
-            kernel= "file:///"++ swarm ++"root/boot/kernel",
-            initrd= [ "file:///"++ swarm ++"root/boot/initrd", ],
-            cmdline= ' '.join(
-              "root=/dev/nfs",
-              "nfsroot="++ nfs_server ++":/"++ swarm ++"root,ro,noacl",
-              "ip=dhcp",
-            )
-          )
-    }).deBlock, regDir= regDir,)
-
+    {## Serving PixieApi & management page over http #}
     this.http = HttpServer(
       that.WEB_MODULES,
-      addr= addr, port= httpPort, routes= {
-        'pixie/v1/boot/:mac': () => { # TODO load from etc files
-          let (mac, **) = perform rqParams
-          perform setContentType$ "text/json"
-          perform writeText$ json$ {
-            "kernel": "file:///cnroot/boot/kernel",
-            "initrd": [
-              "file:///cnroot/boot/initrd",
-            ],
-            "cmdline": ' '.join(
-              "root=/dev/nfs",
-              "nfsroot=10.88.88.139:/cnroot,ro,noacl",
-              "ip=dhcp",
-              # "single", # for rescue
-            ),
-          }
-        },
+      addr= httpInterface, port= httpPort, routes= {
+        'pixie/v1/boot/:mac': that.pixieApi,
       } =< that.URL_ROUTES,
     )
     case this.http.addrs() of {
@@ -92,6 +84,69 @@ export class SwarmController {
       error( 'Swarm Control Center failed start serving.' )
     }
 
+    {## Computing node heartbeats sniffer #}
+    this.hb = Sniffer(
+      that.sniffHeartbeats,
+      addr= hbInterface, port= hbPort,
+    )
+    case this.hb.addrs() of {
+      { hbAddr :> _extraHttpAddrs } -> {
+        console.info<| 'Swarm Control Center sniffing udp://'
+        ++ hbAddr.host() ++ ':' ++ hbAddr.port() ++ ' for cnode heartbeating.'
+      }
+      error( 'Swarm Control Center failed heartbeat sniffing.' )
+    }
+
+  }
+
+  method pixieApi() {
+    let ( mac, ** ) = perform rqParams
+    let ( boot, ** ) = this.nreg.cfgOf(mac)
+    null(boot) -> { # this node configured to be not bootable
+      perform setResponseCode(404)
+    }
+    assert$@ type(boot) is 'Blob' $@ (
+      # `boot` should already be the utf8 payload as for pixie json response
+      'bug: cnode cfg for ['++ mac ++'] supplied boot data of '
+      ++ type(boot) ++' type instead of Blob'
+    )
+    perform setContentType$ "text/json"
+    perform writeBS$ boot
+  }
+
+  # this method is run by Sniffer as a separate, dedicated Đ program
+  method sniffHeartbeats() {
+    defer console.info<| 'Swarm Control Center done sniffing heartbeats.'
+
+    # make all exported methods available to incoming commands
+    # (no effect by far, only json payload incoming, and no method actually exported)
+    from that import * into perform svcScope
+
+    # loop forever until eol on error, or stopped explicitly
+    while perform eol() is false {@
+
+      # expect json payload broadcasted periodically from booted computing nodes
+      case perform sniff() of { hbd } | type(hbd) is 'Dict' -> {
+        case hbd['mac'] of {
+          { mac } | type(mac) is 'String' -> pass
+          console.warn<| 'Unexpected heartbeat payload:\n' ++ hbd
+          continue
+        }
+        case hbd['heartbeat'] of {
+          { meta } | type(meta) is 'Dict' -> pass
+          console.warn<| 'Unexpected heartbeat payload:\n' ++ hbd
+          continue
+        }
+
+        let ( attrs, ** ) = this.nreg.cfgOf(mac)
+        {## it's a sandboxed scope, meant to be updated by heartbeats from booted node #}
+        attrs =: scope()
+        attrs.put(**meta)
+      }
+
+    @} $=> { exc } -> {
+      console.error<| 'Error sniffing heartbeats: ' ++ desc( exc )
+    }
   }
 
 
@@ -100,6 +155,7 @@ export class SwarmController {
   }
 
   method stop() {
+    this.hb.stop()
     this.http.stop()
   }
 

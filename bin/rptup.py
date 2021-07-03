@@ -4,12 +4,12 @@ import subprocess, re, socket, json, sys
 import datetime, psutil
 
 
-ts = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
 vmem = psutil.virtual_memory()
 swap = psutil.swap_memory()
 cpu_freq = psutil.cpu_freq()
 cpu_load = psutil.cpu_percent(interval=3, percpu=True)
 nps = sum(1 for _ in psutil.process_iter())
+ts = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
 
 
 addr, port = "255.255.255.255", 6768
@@ -48,9 +48,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
             announcement = json.dumps(
                 {
                     "mac": mac,
-                    "ip": ip,
                     "heartbeat": {
                         "timestamp": ts,
+                        "ip": ip,
                         "vmem": {f: getattr(vmem, f) for f in vmem._fields},
                         "swap": {f: getattr(swap, f) for f in swap._fields},
                         "cpufreq": cpu_freq,
@@ -60,6 +60,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
                 }
             )
 
-            print(f"Reporting to [{addr}:{port}]", file=sys.stderr)
+            print(f"Reporting [{ip}] to [{addr}:{port}]", file=sys.stderr)
             # print(announcement, file=sys.stderr)
             sock.sendto(announcement.encode("utf-8"), (addr, port))

@@ -97,10 +97,14 @@ createNodeRegClass !clsOuterScope =
                         (edh'scope'proc sb)
                           { edh'procedure'decl =
                               ProcDecl
-                                { edh'procedure'addr = AttrAddrSrc (NamedAttr srcName) noSrcRange,
-                                  edh'procedure'args = WildReceiver,
-                                  edh'procedure'body = StmtSrc VoidStmt noSrcRange,
-                                  edh'procedure'loc = SrcLoc (SrcDoc srcName) zeroSrcRange
+                                { edh'procedure'addr =
+                                    AttrAddrSrc (NamedAttr srcName) noSrcRange,
+                                  edh'procedure'args =
+                                    NullaryReceiver,
+                                  edh'procedure'body =
+                                    StmtSrc VoidStmt noSrcRange,
+                                  edh'procedure'loc =
+                                    SrcLoc (SrcDoc srcName) zeroSrcRange
                                 }
                           }
                   return sb {edh'scope'proc = sbp}
@@ -193,7 +197,7 @@ loadNodeCfg !world !srcName !src !attrs = do
                 <$> mkHostProc effsScope vc nm hp
               | (nm, vc, hp) <-
                   [ -- record boot parameters conforming to pixie api
-                    ("boot", EdhMethod, (bootProc, WildReceiver))
+                    ("boot", EdhMethod, (bootProc, NullaryReceiver))
                   ]
             ]
         let !effArts = effMths

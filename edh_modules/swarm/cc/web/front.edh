@@ -37,7 +37,7 @@ export method renderPage(
 
             # TODO td cells here
 
-          } for@ ( cfgSrc, cfgAttrs, ** ) from knownNodes()
+          } for@ ( src as cfgSrc, attrs as cfgAttrs, ** ) from knownNodes()
         }
 
       }

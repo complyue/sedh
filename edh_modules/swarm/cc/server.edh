@@ -12,6 +12,7 @@ export class SwarmController {
 
   {## a stack of Đ modules, overlaid in providing files as static web resources #}
   WEB_MODULES = (
+    'swarm/cc/web', # from sedh
     'swarm/web', # from sedh
     'net/web', # from nedh
     'web', # from edh
@@ -75,15 +76,15 @@ export class SwarmController {
     {## Serving PixieApi & management page over http #}
     this.http = HttpServer(
       that.WEB_MODULES,
-      addr= httpInterface, port= httpPort, routes= {
+      addr= httpInterface, port= httpPort,
+      front= () => {
+        perform setContentType('text/html')
+        effect method @ht'write'payload(chunk) {
+          perform writeText$ str$ chunk
+        }
+        runTag$ frontPage$ this.nreg.knownNodes
+      }, routes= {
         'pixie/v1/boot/:mac': that.pixieApi,
-        '': () => {
-          perform setContentType('text/html')
-          effect method @ht'write'payload(chunk) {
-            perform writeText$ str$ chunk
-          }
-          runTag$ frontPage$ this.nreg.knownNodes
-        },
       } =< that.URL_ROUTES,
     )
     case this.http.addrs() of {

@@ -40,6 +40,19 @@ data NodeCfg = NodeCfg
     node'cfg'boot'json :: !(Maybe ByteString)
   }
 
+wrapNodeCfg :: NodeCfg -> EdhTxExit EdhValue -> EdhTx
+wrapNodeCfg (NodeCfg !src _tsCfg !attrs !boot) !exit !ets = do
+  !attrsWrapper <- mkScopeWrapper ets attrs
+  runEdhTx ets $
+    exit $
+      EdhArgsPack $
+        ArgsPack [] $
+          odFromList
+            [ (AttrByName "src", EdhString src),
+              (AttrByName "attrs", EdhObject attrsWrapper),
+              (AttrByName "boot", maybe edhNone EdhBlob boot)
+            ]
+
 createNodeRegClass :: Scope -> STM Object
 createNodeRegClass !clsOuterScope =
   mkHostClass clsOuterScope "NodeReg" (allocEdhObj nregAllocator) [] $
@@ -49,7 +62,8 @@ createNodeRegClass !clsOuterScope =
           [ (AttrByName nm,) <$> mkHostProc clsScope vc nm hp
             | (nm, vc, hp) <-
                 [ ("__repr__", EdhMethod, wrapHostProc nregReprProc),
-                  ("cfgOf", EdhMethod, wrapHostProc nregCfgOfProc)
+                  ("cfgOf", EdhMethod, wrapHostProc nregCfgOfProc),
+                  ("knownNodes", EdhGnrtor, wrapHostProc nregKnownNodesProc)
                 ]
           ]
       iopdUpdate mths $ edh'scope'entity clsScope
@@ -155,16 +169,7 @@ createNodeRegClass !clsOuterScope =
       where
         world = edh'prog'world $ edh'thread'prog ets
 
-        exitWithCfg (NodeCfg !src _tsCfg !attrs !boot) = do
-          !attrsWrapper <- mkScopeWrapper ets attrs
-          exitEdh ets exit $
-            EdhArgsPack $
-              ArgsPack [] $
-                odFromList
-                  [ (AttrByName "src", EdhString src),
-                    (AttrByName "attrs", EdhObject attrsWrapper),
-                    (AttrByName "boot", maybe edhNone EdhBlob boot)
-                  ]
+        exitWithCfg !ncfg = runEdhTx ets $ wrapNodeCfg ncfg $ exitEdhTx exit
 
         cfgFileName = T.map fsMapChar mac <> ".edh"
         fsMapChar = \case
@@ -178,6 +183,15 @@ createNodeRegClass !clsOuterScope =
           '?' -> '-'
           '!' -> '-'
           c -> c
+
+    nregKnownNodesProc :: EdhHostProc
+    nregKnownNodesProc !exit !ets = withThisHostObj ets $ \(nreg :: NodeReg) ->
+      iopdToList (node'cfg'reg nreg) >>= runEdhTx ets . yieldNext
+      where
+        yieldNext :: [(NodeKey, NodeCfg)] -> EdhTx
+        yieldNext [] = exitEdhTx exit nil
+        yieldNext ((_mac, !cfg) : rest) = wrapNodeCfg cfg $ \ !cfgVal ->
+          edhYield cfgVal (const $ yieldNext rest) exit
 
 loadNodeCfg :: EdhWorld -> Text -> Text -> Scope -> IO (Maybe ByteString)
 loadNodeCfg !world !srcName !src !attrs = do

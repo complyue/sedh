@@ -63,6 +63,7 @@ They are usually triggered by either dhcp booting or heartbeating
       yield (
         src =: 'cfg stmts',
         attrs =: scope(),
+        boot =: blob() or None,
       )
       # multiple records to be yielded ...
     }

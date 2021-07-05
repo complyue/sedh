@@ -75,18 +75,10 @@ export class SwarmController {
     this.http = HttpServer(
       that.WEB_MODULES,
       addr= httpInterface, port= httpPort,
-      front= () => {
-        perform setContentType('text/html')
-        effect {
-          method @ht'write'payload(chunk) {
-            perform writeText$ str$ chunk
-          }
-          knownNodes = this.nreg.knownNodes
-        }
-        runTag$ include './web/front'
-      }, routes= {
+      routes= {
         'pixie/v1/boot/:mac': that.pixieApi,
       } =< that.URL_ROUTES,
+      front= this.managementPage,
     )
     case this.http.addrs() of {
       { httpAddr :> _extraHttpAddrs } -> {
@@ -109,6 +101,17 @@ export class SwarmController {
       error( 'Swarm Control Center failed heartbeat sniffing.' )
     }
 
+  }
+
+  method managementPage() {
+    perform setContentType('text/html')
+    effect {
+      method @ht'write'payload(chunk) {
+        perform writeText$ str$ chunk
+      }
+      knownNodes = this.nreg.knownNodes
+    }
+    runTag$ include './web/front'
   }
 
   method pixieApi() {

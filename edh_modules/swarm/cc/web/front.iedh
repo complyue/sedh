@@ -11,28 +11,42 @@ effect {
 
   method head() {
     fallback head()
-    html.link( rel= 'stylesheet', href= '/cc.css' )$ pass
+    html.link( rel= 'stylesheet', href= '/cc.css' )
   }
 
   method body'content() {
 
     html.div(class= 'page_header')$ {
-      html.tag('h3')$ {
-        behave @tag'inner'text$ perform title
-      }
+      html.h3()$ perform title
     }
 
     html.section(id= 'cnodes_info')$ {
 
-      html.tag('table')$ {
-        html.tag('thead')$ html.tag('tr')$ {
+      html.table()$ {
+        html.thead()$ html.tr()$ {
 
-          # TODO th cells here
+          html.th()$ 'MAC'
+          html.th()$ 'IP'
+
+          html.th()$ 'Config'
 
         }
-        html.tag('tbody')$ do html.tag('tr')$ {
+        html.tbody()$ do html.tr()$ {
 
-          # TODO td cells here
+          let (
+            mac, ip, vmem, cpuload, nps,
+            login_link,
+            **
+          ) = cfgAttrs.attrs()
+
+          html.td()$ mac
+          html.td()$ {
+            behave @tag'inner'text$ ip
+            html.br()
+            html.a(href= login_link())$ 'Login'
+          }
+
+          html.td()$ html.textarea(readonly= '', cols=38, rows= 2,)$ cfgSrc
 
         } for@ ( src as cfgSrc, attrs as cfgAttrs, ** )
         from perform knownNodes()
@@ -44,7 +58,7 @@ effect {
 
   method body'end'scripts() {
     fallback body'end'scripts()
-    html.script(src= '/cc.js') $ pass
+    html.script(src= '/cc.js')$ pass
   }
 
 }

@@ -6,7 +6,7 @@ effect default {
   title = '?!?'
 
   method head() {
-    html.link( rel= 'icon', href= '/icons/favicon.png' )$ pass
+    html.link( rel= 'icon', href= '/icons/favicon.png' )
   }
 
   method body() {

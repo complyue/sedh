@@ -6,7 +6,6 @@ import datetime, psutil
 
 vmem = psutil.virtual_memory()
 swap = psutil.swap_memory()
-cpu_freq = psutil.cpu_freq()
 cpu_load = psutil.cpu_percent(interval=3, percpu=True)
 nps = sum(1 for _ in psutil.process_iter())
 ts = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
@@ -53,7 +52,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
                         "ip": ip,
                         "vmem": {f: getattr(vmem, f) for f in vmem._fields},
                         "swap": {f: getattr(swap, f) for f in swap._fields},
-                        "cpufreq": cpu_freq,
                         "cpuload": cpu_load,
                         "nps": nps,
                     },

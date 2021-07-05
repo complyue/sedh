@@ -5,8 +5,6 @@ import (NodeReg, **) 'swarm/CTRL'
 
 import * './debug'
 
-import ( renderPage as frontPage, ** ) './web/front'
-
 
 export class SwarmController {
 
@@ -79,10 +77,13 @@ export class SwarmController {
       addr= httpInterface, port= httpPort,
       front= () => {
         perform setContentType('text/html')
-        effect method @ht'write'payload(chunk) {
-          perform writeText$ str$ chunk
+        effect {
+          method @ht'write'payload(chunk) {
+            perform writeText$ str$ chunk
+          }
+          knownNodes = this.nreg.knownNodes
         }
-        runTag$ frontPage$ this.nreg.knownNodes
+        runTag$ include './web/front'
       }, routes= {
         'pixie/v1/boot/:mac': that.pixieApi,
       } =< that.URL_ROUTES,

@@ -1,0 +1,52 @@
+import * 'net/http'
+
+
+effect default {
+  title = 'Swarm Control Center'
+}
+
+effect {
+
+  title = perform title # layout needs this
+
+  method head() {
+    fallback head()
+    html.link( rel= 'stylesheet', href= '/cc.css' )$ pass
+  }
+
+  method body'content() {
+
+    html.div(class= 'page_header')$ {
+      html.tag('h3')$ {
+        behave @tag'inner'text$ perform title
+      }
+    }
+
+    html.section(id= 'cnodes_info')$ {
+
+      html.tag('table')$ {
+        html.tag('thead')$ html.tag('tr')$ {
+
+          # TODO th cells here
+
+        }
+        html.tag('tbody')$ do html.tag('tr')$ {
+
+          # TODO td cells here
+
+        } for@ ( src as cfgSrc, attrs as cfgAttrs, ** )
+        from perform knownNodes()
+      }
+
+    }
+
+  }
+
+  method body'end'scripts() {
+    fallback body'end'scripts()
+    html.script(src= '/cc.js') $ pass
+  }
+
+}
+
+include './layout'

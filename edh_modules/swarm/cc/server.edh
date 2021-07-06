@@ -37,7 +37,7 @@ export class SwarmController {
     ip ?= None
     vmem ?= {"total": 0, "available": 0, "active": 0, "inactive": 0, }
     swap ?= {"total": 0, "used": 0, "free": 0,}
-    cpuload ?= [0, 0,] # utilized percents of each virtual one
+    cpuload ?= [] # utilized percents of each virtual one
     nps ?= 0 # number of processes
 
     # provide clickable link to show on the browser for login to this node

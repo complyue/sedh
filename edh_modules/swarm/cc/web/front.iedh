@@ -47,15 +47,15 @@ effect {
           ) = cfgAttrs.attrs()
 
           html.td()$ swarm
-          html.td()$ html.div(style= "min-width: 120pt;")$ {
+          html.td()$ {
             behave @tag'inner'text$ ip
             html.br()
             link = login_link()
-            html.div(title= link, style= "display: inline;")$ {
+            html.span(title= link)$ {
               html.a(href= link)$ "LOGIN"
             }
             html.nbsp()
-            html.div(title= "Reboot the node", style= "display: inline;")$ {
+            html.span(title= "Reboot the node")$ {
               html.button(
                 onclick= "promptReboot('"++ ip ++"', '"++ admin_account() ++"')"
               )$ "REBOOT"

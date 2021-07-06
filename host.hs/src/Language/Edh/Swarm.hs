@@ -2,7 +2,9 @@ module Language.Edh.Swarm where
 
 -- import           Debug.Trace
 
+import Control.Concurrent.STM
 import Control.Monad.Reader
+import Data.Text (Text)
 import qualified Data.Text as T
 import Language.Edh.EHI
 import Language.Edh.Net
@@ -11,7 +13,18 @@ import Language.Edh.Run
 import Language.Edh.Swarm.NodeCfg
 import Language.Edh.Swarm.Starter
 import Language.Edh.Swarm.Worker
+import System.Exit
+import System.Process
 import Prelude
+
+systemProc :: "cmd" !: Text -> EdhHostProc
+systemProc (mandatoryArg -> !cmd) !exit !ets =
+  runEdhTx ets $
+    edhContIO $
+      system (T.unpack cmd) >>= \case
+        ExitSuccess -> atomically $ exitEdh ets exit nil
+        ExitFailure !errCode ->
+          atomically $ exitEdh ets exit $ EdhDecimal $ fromIntegral errCode
 
 installSwarmCtrlBatteries :: EdhWorld -> IO ()
 installSwarmCtrlBatteries !world = do
@@ -19,7 +32,15 @@ installSwarmCtrlBatteries !world = do
     installEdhModule world "swarm/CTRL" $ \ !ets !exit -> do
       let !moduScope = contextScope $ edh'context ets
       !nregClass <- createNodeRegClass moduScope
-      let !moduArts = [(AttrByName "NodeReg", EdhObject nregClass)]
+
+      !moduMths <-
+        sequence $
+          [ (AttrByName nm,) <$> mkHostProc moduScope mc nm hp
+            | (nm, mc, hp) <-
+                [("system", EdhMethod, wrapHostProc systemProc)]
+          ]
+
+      let !moduArts = (AttrByName "NodeReg", EdhObject nregClass) : moduMths
 
       iopdUpdate moduArts $ edh'scope'entity moduScope
       prepareExpStore ets (edh'scope'this moduScope) $ \ !esExps ->

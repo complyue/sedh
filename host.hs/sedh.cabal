@@ -183,6 +183,7 @@ library
     , mtl
     , nedh
     , network
+    , process
     , scientific
     , stm                   >=2.5
     , text

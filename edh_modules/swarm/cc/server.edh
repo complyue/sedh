@@ -1,7 +1,7 @@
 import * 'net'
 import * 'net/html'
 
-import (NodeReg, **) 'swarm/CTRL'
+import ( NodeReg, system, ** ) 'swarm/CTRL'
 
 import * './debug'
 
@@ -80,6 +80,7 @@ export class SwarmController {
       that.WEB_MODULES,
       addr= httpInterface, port= httpPort,
       routes= {
+        'reboot/:account': that.rebootApi,
         'pixie/v1/boot/:mac': that.pixieApi,
         'cnode/v1/save/:mac': that.cfgSaveApi,
         'cnode/v1/load/:mac': that.cfgLoadApi,
@@ -168,6 +169,22 @@ export class SwarmController {
     )
     perform setContentType$ "text/json"
     perform writeBS$ boot
+  }
+
+  method rebootApi() {
+    perform setContentType('text/plain')
+    let ( account, ** ) = perform rqParams
+    case system(
+      "ssh " ++ account ++ " 'sudo reboot'"
+    ) of {
+      { errCode } -> {
+        # destined to err out as the ssh connection will be forcefully disconnected immediately,
+        # don't report the error for now, to figure out some better handling later.
+        # perform setResponseCode(500)
+        perform writeText$ "Reboot cmd exited with: " ++ errCode
+      }
+      perform writeText$ "ok"
+    }
   }
 
   # this method is run by Sniffer as a separate, dedicated Đ program

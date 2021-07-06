@@ -90,4 +90,13 @@ They are usually triggered by either dhcp booting or heartbeating
 
   }
 
+
+  {## Run a shell command
+
+This is just a wrapper around:
+  https://hackage.haskell.org/package/process/docs/System-Process.html#v:system
+
+   #}
+  method system(cmd) pass
+
 }

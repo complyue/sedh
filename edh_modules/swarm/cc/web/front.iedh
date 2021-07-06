@@ -1,5 +1,7 @@
 import * 'net/html'
 
+import ( sccDebug, ** ) 'swarm/cc/debug'
+
 
 effect default {
   title = 'Swarm Control Center'
@@ -42,6 +44,8 @@ effect {
           **
         ) = cfgAttrs.attrs()
 
+        # sccDebug.replHere()
+
         html.td()$ str$ swarm
         html.td()$ if null$boot then "UNBOOTABLE" else {
           behave @tag'inner'text$ ip
@@ -52,8 +56,8 @@ effect {
           }
           html.nbsp()
           html.span(title= "Reboot the node")$ {
-            html.button(
-              onclick= "promptReboot('"++ ip ++"', '"++ admin_account() ++"')"
+            html.button( name= "reboot"
+              , @'data-ip' = ip, @'data-account' = admin_account()
             )$ "REBOOT"
           }
         }

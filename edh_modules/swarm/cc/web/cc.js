@@ -2,10 +2,6 @@
  * Swarm Control Center
  */
 
-window.promptReboot = function promptReboot(ip, account) {
-  if (!window.confirm(`Reboot [${ip}] ?`)) return
-  window.alert('do reboot as: ' + account)
-}
 
 const pageEpoch = Date.now()
 
@@ -39,6 +35,7 @@ function stopEditTextArea(ta) {
 
   ta.readOnly = true
 }
+
 
 const cnodeTable = document.getElementById("cnode_tbl")
 
@@ -116,6 +113,15 @@ cnodeTable.addEventListener("click", async function (evt) {
       for (let ta of cfe.querySelectorAll("textarea")) {
         ta.value = ta.dataset.preEdit
         stopEditTextArea(ta)
+      }
+      break
+    case "reboot":
+      const ip = btn.dataset.ip, account = btn.dataset.account
+      if (!window.confirm(`Confirm to reboot [${ip}] ?`)) return
+      const resp = await fetch('/reboot/' + account)
+      if (!resp.ok) {
+        console.error("Reboot failure:", resp)
+        alert("Failed rebooting [" + ip + "]: " + resp.status)
       }
       break
     default:

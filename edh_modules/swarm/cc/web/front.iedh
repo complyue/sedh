@@ -47,7 +47,7 @@ effect {
           ) = cfgAttrs.attrs()
 
           html.td()$ str$ swarm
-          html.td()$ {
+          html.td()$ if null$boot then "UNBOOTABLE" else {
             behave @tag'inner'text$ ip
             html.br()
             link = login_link()
@@ -83,7 +83,7 @@ effect {
             html.textarea(readonly= '', cols=38, rows= 2,)$ cfgSrc
           }
 
-        } for@ ( src as cfgSrc, attrs as cfgAttrs, ** )
+        } for@ ( src as cfgSrc, attrs as cfgAttrs, boot, ** )
         from perform knownNodes()
       }
 

@@ -1,5 +1,5 @@
 import * 'net'
-import * 'net/http'
+import * 'net/html'
 
 import (NodeReg, **) 'swarm/CTRL'
 

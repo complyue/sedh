@@ -1,4 +1,4 @@
-import * 'net/http'
+import * 'net/html'
 
 
 effect default {
@@ -11,7 +11,7 @@ effect {
 
   method head() {
     fallback head()
-    html.link( rel= 'stylesheet', href= '/cc.css' )
+    html.link( rel= 'stylesheet' href= '/cc.css' )
   }
 
   method body'content() {
@@ -46,7 +46,7 @@ effect {
             **
           ) = cfgAttrs.attrs()
 
-          html.td()$ swarm
+          html.td()$ str$ swarm
           html.td()$ {
             behave @tag'inner'text$ ip
             html.br()
@@ -62,7 +62,7 @@ effect {
             }
           }
 
-          html.td()$ timestamp
+          html.td()$ str$ timestamp
 
           html.td()$ str$ len$ cpuload
           html.td()$ str$ (
@@ -75,7 +75,7 @@ effect {
             ++ " / " ++
             (swap["total"]/1024**3).ceil
           )
-          html.td()$ str$nps
+          html.td()$ str$ nps
 
           html.td()$ {
             behave @tag'inner'text$ mac

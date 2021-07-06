@@ -16,77 +16,77 @@ effect {
 
   method body'content() {
 
-    html.div(class= 'page_header')$ {
-      html.h3()$ perform title
-    }
+    html.h3()$ perform title
 
-    html.section(id= 'cnodes_info')$ {
+    html.table(id= "cnode_tbl")$ {
+      html.thead()$ html.tr()$ {
 
-      html.table()$ {
-        html.thead()$ html.tr()$ {
+        html.th()$ "Swarm"
+        html.th()$ "IP"
 
-          html.th()$ "Swarm"
-          html.th()$ "IP"
+        html.th()$ "Heartbeat"
 
-          html.th()$ "Heartbeat"
+        html.th()$ "#CPU"
+        html.th()$ behave @tag'inner'html$ "RAM<br>(GB)"
+        html.th()$ behave @tag'inner'html$ "SWAP<br>(GB)"
+        html.th()$ "#PS"
 
-          html.th()$ "#CPU"
-          html.th()$ behave @tag'inner'html$ "RAM<br>(GB)"
-          html.th()$ behave @tag'inner'html$ "SWAP<br>(GB)"
-          html.th()$ "#PS"
+        html.th()$ 'Config'
 
-          html.th()$ 'Config'
-
-        }
-        html.tbody()$ do html.tr()$ {
-
-          let (
-            swarm, mac, timestamp, ip, vmem, swap, cpuload, nps,
-            login_link, admin_account,
-            **
-          ) = cfgAttrs.attrs()
-
-          html.td()$ str$ swarm
-          html.td()$ if null$boot then "UNBOOTABLE" else {
-            behave @tag'inner'text$ ip
-            html.br()
-            link = login_link()
-            html.span(title= link)$ {
-              html.a(href= link)$ "LOGIN"
-            }
-            html.nbsp()
-            html.span(title= "Reboot the node")$ {
-              html.button(
-                onclick= "promptReboot('"++ ip ++"', '"++ admin_account() ++"')"
-              )$ "REBOOT"
-            }
-          }
-
-          html.td()$ str$ timestamp
-
-          html.td()$ str$ len$ cpuload
-          html.td()$ str$ (
-            (vmem["available"]/1024**3).ceil
-            ++ " / " ++
-            (vmem["total"]/1024**3).ceil
-          )
-          html.td()$ str$(
-            (swap["free"]/1024**3).ceil
-            ++ " / " ++
-            (swap["total"]/1024**3).ceil
-          )
-          html.td()$ str$ nps
-
-          html.td()$ {
-            behave @tag'inner'text$ mac
-            html.br()
-            html.textarea(readonly= '', cols=38, rows= 2,)$ cfgSrc
-          }
-
-        } for@ ( src as cfgSrc, attrs as cfgAttrs, boot, ** )
-        from perform knownNodes()
       }
+      html.tbody()$ do html.tr()$ {
 
+        let (
+          swarm, mac, timestamp, ip, vmem, swap, cpuload, nps,
+          login_link, admin_account,
+          **
+        ) = cfgAttrs.attrs()
+
+        html.td()$ str$ swarm
+        html.td()$ if null$boot then "UNBOOTABLE" else {
+          behave @tag'inner'text$ ip
+          html.br()
+          link = login_link()
+          html.span(title= link)$ {
+            html.a(href= link)$ "LOGIN"
+          }
+          html.nbsp()
+          html.span(title= "Reboot the node")$ {
+            html.button(
+              onclick= "promptReboot('"++ ip ++"', '"++ admin_account() ++"')"
+            )$ "REBOOT"
+          }
+        }
+
+        html.td()$ str$ timestamp
+
+        html.td()$ str$ len$ cpuload
+        html.td()$ str$ (
+          (vmem["available"]/1024**3).ceil
+          ++ " / " ++
+          (vmem["total"]/1024**3).ceil
+        )
+        html.td()$ str$(
+          (swap["free"]/1024**3).ceil
+          ++ " / " ++
+          (swap["total"]/1024**3).ceil
+        )
+        html.td()$ str$ nps
+
+        html.td(style= "resize: both;")$ html.div(class= "CfgEdit")$ {
+          html.div(class= "EditBtnBar")$ {
+            html.button(name= "save" disabled= "")$ html.literal('&#x2714;')
+            html.label()$ str$ mac
+            html.button(name= "cancel" disabled= "")$ html.literal('&#x2718;')
+          }
+          html.textarea(
+            readonly= '' cols=38 rows= 2
+            , @'data-mac'= mac
+          )$ cfgSrc
+        }
+
+      } for@ ( src as cfgSrc, attrs as cfgAttrs, boot, ** )
+      from perform knownNodes()
     }
 
   }

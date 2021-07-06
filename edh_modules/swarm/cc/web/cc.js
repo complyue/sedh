@@ -8,131 +8,101 @@ window.promptReboot = function promptReboot(ip, account) {
 }
 
 
-function getOffset(el) {
-  var _x = 0;
-  var _y = 0;
-  while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
-    _x += el.offsetLeft - el.scrollLeft;
-    _y += el.offsetTop - el.scrollTop;
-    el = el.offsetParent;
-  }
-  return { top: _y, left: _x };
-}
-
 function startEditTextArea(ta) {
-  const { top, left } = getOffset(ta);
-  const width = ta.scrollWidth;
+  ta.readOnly = false
+  const cfe = ta.closest("div.CfgEdit")
+  for (let btn of cfe.querySelectorAll("button")) {
+    btn.disabled = false
+  }
 
-  const tast = ta.style;
-
-  tast.width = "" + width + "px";
-  setTimeout(() => {
-    const height = ta.scrollHeight;
-    tast.position = "fixed";
-    tast.height = "" + height + "px";
-    tast.top = "" + (top + 16) + "px";
-    tast.left = "" + left + "px";
-  }, 1);
+  const pst = cfe.style
+  pst.width = "" + Math.max(640, Math.min(1200, 36 + ta.scrollWidth)) + "px"
+  pst.height = "" + Math.max(200, Math.min(700, 36 + ta.scrollHeight)) + "px"
+  pst.position = "fixed"
+  ta.focus()
 }
 
 function stopEditTextArea(ta) {
-  const tast = ta.style;
+  ta.readOnly = true
+  const cfe = ta.closest("div.CfgEdit")
+  for (let btn of cfe.querySelectorAll("button")) {
+    btn.disabled = true
+  }
 
-  tast.position = "";
-  tast.width = "";
-  tast.height = "";
-  tast.top = "";
-  tast.left = "";
+  const pst = cfe.style
+  pst.width = "auto"
+  pst.height = "auto"
+  pst.position = "static"
 }
 
-const cnodeTable = document.getElementById("cnode_tbl");
+const cnodeTable = document.getElementById("cnode_tbl")
 
 // double click on textareas
 cnodeTable.addEventListener("dblclick", function (evt) {
-  const ta = evt.target;
+  const ta = evt.target
   if ("TEXTAREA" !== ta.tagName) {
-    return;
+    return
   }
   if (!ta.readOnly) {
     // in editing mode, let it be default behavior
-    return;
-  }
-
-  if (ta.dataset.filename) {
-    // only start edit if has a filename with it
-
-    ta.dataset.preEdit = ta.value;
-    ta.readOnly = false;
-    const cfe = ta.closest("div.ConfigFileEdit");
-    for (let btn of cfe.querySelectorAll("button")) {
-      btn.disabled = false;
-    }
-
-    ta.blur();
-    ta.focus();
-    startEditTextArea(ta);
+    return
   }
 
   // cease other behaviors for double click on readonly textarea
-  evt.preventDefault();
-  evt.stopImmediatePropagation();
-});
+  evt.preventDefault()
+  evt.stopImmediatePropagation()
+
+  ta.dataset.preEdit = ta.value
+  startEditTextArea(ta)
+})
 
 // button click
 cnodeTable.addEventListener("click", async function (evt) {
-  const btn = evt.target;
+  const btn = evt.target
   if ("BUTTON" != btn.tagName) {
-    return;
+    return
   }
-  const cfe = btn.closest("div.ConfigFileEdit");
-  switch (btn.dataset.act) {
+  const cfe = btn.closest("div.CfgEdit")
+  switch (btn.name) {
     case "save":
       for (let ta of cfe.querySelectorAll("textarea")) {
         try {
           const resp = await fetch("/cnode/v1/save", {
             method: "POST",
             body: JSON.stringify({
-              FileName: ta.dataset.filename,
-              AfterEdit: ta.value,
-              PreEdit: ta.dataset.preEdit
+              mac: ta.dataset.mac,
+              afterEdit: ta.value,
+              preEdit: ta.dataset.preEdit
             }),
             headers: {
               "Content-Type": "application/json"
             }
-          });
+          })
           if (!resp.ok) {
-            console.error("Config save failure:", resp);
-            alert("Failed saving config: " + resp.status);
-            return;
+            console.error("Config save failure:", resp)
+            alert("Failed saving config: " + resp.status)
+            return
           }
-          const result = await resp.json();
+          const result = await resp.json()
           if (result.err) {
-            console.error("Failed saving config:", result);
-            alert(result.err);
-            return;
+            console.error("Failed saving config:", result)
+            alert(result.err)
+            return
           }
-          ta.readOnly = true;
-          stopEditTextArea(ta);
-          for (let btn of cfe.querySelectorAll("button")) {
-            btn.disabled = true;
-          }
+          stopEditTextArea(ta)
         } catch (err) {
-          console.error("Error saving config:", err);
-          alert("Failed saving config: " + err);
+          console.error("Error saving config:", err)
+          alert("Failed saving config: " + err)
         }
       }
-      break;
+      break
     case "cancel":
       for (let ta of cfe.querySelectorAll("textarea")) {
-        ta.readOnly = true;
-        ta.value = ta.dataset.preEdit;
-        stopEditTextArea(ta);
+        ta.value = ta.dataset.preEdit
+        stopEditTextArea(ta)
       }
-      for (let btn of cfe.querySelectorAll("button")) {
-        btn.disabled = true;
-      }
-      break;
+      break
     default:
-      console.warn("Unknown button action:", btn.dataset.act, btn);
+      console.warn("Unknown button action:", btn.dataset.act, btn)
   }
-});
+})

@@ -63,6 +63,7 @@ button {
 }
 
 div.CfgEdit {
+  z-index: 1;
   background-color: #e1eed1;
   opacity: 0.8;
   display: flex;
@@ -73,6 +74,8 @@ div.CfgEdit {
 div.CfgEdit .EditBtnBar {
   flex: none;
   text-align: left;
+
+  cursor: move;
 }
 
 div.CfgEdit > textarea {

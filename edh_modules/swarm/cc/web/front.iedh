@@ -73,7 +73,7 @@ effect {
         )
         html.td()$ str$ nps
 
-        html.td(style= "resize: both;")$ html.div(class= "CfgEdit")$ {
+        html.td()$ html.div(class= "CfgEdit")$ {
           html.div(class= "EditBtnBar")$ {
             html.button(name= "save" disabled= "")$ html.literal('&#x2714;')
             html.label()$ str$ mac

@@ -7,32 +7,37 @@ window.promptReboot = function promptReboot(ip, account) {
   window.alert('do reboot as: ' + account)
 }
 
+const pageEpoch = Date.now()
 
 function startEditTextArea(ta) {
-  ta.readOnly = false
   const cfe = ta.closest("div.CfgEdit")
   for (let btn of cfe.querySelectorAll("button")) {
     btn.disabled = false
   }
+  cfe.style.zIndex = Date.now() - pageEpoch
 
   const pst = cfe.style
   pst.width = "" + Math.max(640, Math.min(1200, 36 + ta.scrollWidth)) + "px"
   pst.height = "" + Math.max(200, Math.min(700, 36 + ta.scrollHeight)) + "px"
   pst.position = "fixed"
+
+  ta.readOnly = false
   ta.focus()
 }
 
 function stopEditTextArea(ta) {
-  ta.readOnly = true
   const cfe = ta.closest("div.CfgEdit")
   for (let btn of cfe.querySelectorAll("button")) {
     btn.disabled = true
   }
+  cfe.style.zIndex = 1
 
   const pst = cfe.style
   pst.width = "auto"
   pst.height = "auto"
   pst.position = "static"
+
+  ta.readOnly = true
 }
 
 const cnodeTable = document.getElementById("cnode_tbl")

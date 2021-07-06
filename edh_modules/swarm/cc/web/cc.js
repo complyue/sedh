@@ -43,7 +43,7 @@ function stopEditTextArea(ta) {
 const cnodeTable = document.getElementById("cnode_tbl")
 
 // double click on textareas
-cnodeTable.addEventListener("dblclick", function (evt) {
+cnodeTable.addEventListener("dblclick", async function (evt) {
   const ta = evt.target
   if ("TEXTAREA" !== ta.tagName) {
     return
@@ -57,7 +57,21 @@ cnodeTable.addEventListener("dblclick", function (evt) {
   evt.preventDefault()
   evt.stopImmediatePropagation()
 
-  ta.dataset.preEdit = ta.value
+  const mac = ta.dataset.mac
+  const resp = await fetch("/cnode/v1/load/" + mac)
+  if (!resp.ok) {
+    console.error("Config load failure:", resp)
+    alert("Failed refreshing config: " + resp.status)
+    return
+  }
+  const result = await resp.json()
+  if (result.err) {
+    console.error("Failed refreshing config:", result)
+    alert(result.err)
+    return
+  }
+  ta.dataset.preEdit = ta.value = result['src']
+
   startEditTextArea(ta)
 })
 
@@ -71,34 +85,31 @@ cnodeTable.addEventListener("click", async function (evt) {
   switch (btn.name) {
     case "save":
       for (let ta of cfe.querySelectorAll("textarea")) {
-        try {
-          const resp = await fetch("/cnode/v1/save", {
-            method: "POST",
-            body: JSON.stringify({
-              mac: ta.dataset.mac,
-              afterEdit: ta.value,
-              preEdit: ta.dataset.preEdit
-            }),
-            headers: {
-              "Content-Type": "application/json"
-            }
-          })
-          if (!resp.ok) {
-            console.error("Config save failure:", resp)
-            alert("Failed saving config: " + resp.status)
-            return
+        const mac = ta.dataset.mac
+        const resp = await fetch("/cnode/v1/save/" + mac, {
+          method: "POST",
+          body: JSON.stringify({
+            afterEdit: ta.value,
+            preEdit: ta.dataset.preEdit
+          }),
+          headers: {
+            "Content-Type": "application/json"
           }
-          const result = await resp.json()
-          if (result.err) {
-            console.error("Failed saving config:", result)
-            alert(result.err)
-            return
-          }
-          stopEditTextArea(ta)
-        } catch (err) {
-          console.error("Error saving config:", err)
-          alert("Failed saving config: " + err)
+        })
+        if (!resp.ok) {
+          console.error("Config save failure:", resp)
+          alert("Failed saving config: " + resp.status)
+          return
         }
+        const result = await resp.json()
+        if (result.err) {
+          console.error("Failed saving config:", result)
+          alert(result.err)
+          return
+        }
+        ta.dataset.preEdit = ta.value
+
+        stopEditTextArea(ta)
       }
       break
     case "cancel":
@@ -108,6 +119,6 @@ cnodeTable.addEventListener("click", async function (evt) {
       }
       break
     default:
-      console.warn("Unknown button action:", btn.dataset.act, btn)
+      console.warn("Unknown button action:", btn.dataset.name, btn)
   }
 })

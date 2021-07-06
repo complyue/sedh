@@ -81,6 +81,8 @@ export class SwarmController {
       addr= httpInterface, port= httpPort,
       routes= {
         'pixie/v1/boot/:mac': that.pixieApi,
+        'cnode/v1/save/:mac': that.cfgSaveApi,
+        'cnode/v1/load/:mac': that.cfgLoadApi,
       } =< that.URL_ROUTES,
       front= this.managementPage,
     )
@@ -116,6 +118,41 @@ export class SwarmController {
       knownNodes = this.nreg.knownNodes
     }
     runTag$ include './web/front'
+  }
+
+  method cfgLoadApi() {
+    perform setContentType$ "text/json"
+    rspJson = {}
+    {
+      let
+      , ( mac, ** ) = perform rqParams
+      , ( src, ** ) = this.nreg.cfgOf(mac)
+      rspJson['src'] = src
+    } $=> { exc } -> {
+      rspJson['err'] = desc(exc)
+    } @=> {
+      perform writeText$ json$ rspJson
+    }
+  }
+
+  method cfgSaveApi() {
+    perform setContentType$ "text/json"
+    rspJson = {}
+    {
+      let
+      , ( mac, ** ) = perform rqParams
+      , ( src, ** ) = this.nreg.cfgOf(mac)
+      , reqJson = perform readCommand()
+      case reqJson['preEdit'] of { preEdit }
+      | not null(preEdit) && preEdit is not src -> {
+        rspJson['err'] = 'Config file has changed!'
+      }
+      this.nreg.saveCfgSrc(mac, reqJson['afterEdit'])
+    } $=> { exc } -> {
+      rspJson['err'] = desc(exc)
+    } @=> {
+      perform writeText$ json$ rspJson
+    }
   }
 
   method pixieApi() {

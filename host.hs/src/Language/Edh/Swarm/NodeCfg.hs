@@ -63,6 +63,7 @@ createNodeRegClass !clsOuterScope =
             | (nm, vc, hp) <-
                 [ ("__repr__", EdhMethod, wrapHostProc nregReprProc),
                   ("cfgOf", EdhMethod, wrapHostProc nregCfgOfProc),
+                  ("saveCfgSrc", EdhMethod, wrapHostProc saveCfgSrcProc),
                   ("knownNodes", EdhGnrtor, wrapHostProc nregKnownNodesProc)
                 ]
           ]
@@ -97,31 +98,34 @@ createNodeRegClass !clsOuterScope =
           exitEdh ets exit $
             EdhString $ "NodeReg<" <> T.pack (node'reg'dir nreg) <> ">"
 
+    saveCfgSrcProc :: "mac" !: Text -> "src" !: Text -> EdhHostProc
+    saveCfgSrcProc (mandatoryArg -> !mac) (mandatoryArg -> !src) !exit !ets =
+      withThisHostObj ets $ \(nreg :: NodeReg) -> do
+        (pfp, attrs, _) <- prepareNodeCfg ets nreg mac
+        runEdhTx ets $
+          edhContIO $ do
+            atomically $
+              iopdInsert
+                (AttrByName "mac")
+                (EdhString mac)
+                (edh'scope'entity attrs)
+            !boot <- saveNodeCfg pfp world (T.pack pfp) src attrs
+            -- get file mod time after written
+            !tsFile <- modificationTime <$> getFileStatus pfp
+            -- record & return to Edh
+            atomically $ do
+              let !ncfg = NodeCfg src tsFile attrs boot
+              iopdInsert mac ncfg $ node'cfg'reg nreg
+              runEdhTx ets $ wrapNodeCfg ncfg $ exitEdhTx exit
+      where
+        world = edh'prog'world $ edh'thread'prog ets
+
     nregCfgOfProc :: "mac" !: Text -> EdhHostProc
     nregCfgOfProc (mandatoryArg -> !mac) !exit !ets =
       withThisHostObj ets $ \(nreg :: NodeReg) -> do
-        !cfgLoaded <- iopdLookup mac $ node'cfg'reg nreg
+        (pfp, attrs, cfgLoaded) <- prepareNodeCfg ets nreg mac
         runEdhTx ets $
           edhContIO $ do
-            let !pfp = node'reg'dir nreg </> T.unpack cfgFileName
-                srcName = T.pack pfp
-                createSandbox = do
-                  !sb <- newSandbox ets
-                  let !sbp =
-                        (edh'scope'proc sb)
-                          { edh'procedure'decl =
-                              ProcDecl
-                                { edh'procedure'addr =
-                                    AttrAddrSrc (NamedAttr srcName) noSrcRange,
-                                  edh'procedure'args =
-                                    NullaryReceiver,
-                                  edh'procedure'body =
-                                    StmtSrc VoidStmt noSrcRange,
-                                  edh'procedure'loc =
-                                    SrcLoc (SrcDoc srcName) zeroSrcRange
-                                }
-                          }
-                  return sb {edh'scope'proc = sbp}
             try (modificationTime <$> getFileStatus pfp) >>= \case
               Left (_errRead :: IOError) -> do
                 let !src = node'cfg'default nreg
@@ -129,17 +133,14 @@ createNodeRegClass !clsOuterScope =
                 -- similarly to stat, due to other IO problems, e.g. permission,
                 -- fs corruption etc. and such errors in writting the file will
                 -- propagate to Edh code this time.
-                B.writeFile pfp $ TE.encodeUtf8 src
-                -- get file mod time after written
-                !tsFile <- modificationTime <$> getFileStatus pfp
-                -- load into a new attrs sandbox
-                !attrs <- atomically createSandbox
                 atomically $
                   iopdInsert
                     (AttrByName "mac")
                     (EdhString mac)
                     (edh'scope'entity attrs)
-                !boot <- loadNodeCfg world srcName src attrs
+                !boot <- saveNodeCfg pfp world (T.pack pfp) src attrs
+                -- get file mod time after written
+                !tsFile <- modificationTime <$> getFileStatus pfp
                 -- record & return to Edh
                 atomically $ do
                   let !ncfg = NodeCfg src tsFile attrs boot
@@ -152,15 +153,13 @@ createNodeRegClass !clsOuterScope =
                     atomically $ exitWithCfg ncfg
                 _ -> do
                   !src <- TE.decodeUtf8 <$> B.readFile pfp
-                  !attrs <- case cfgLoaded of
-                    Nothing -> atomically createSandbox
-                    Just !ncfg -> return $ node'cfg'attrs ncfg
+                  -- load disk file for updated cfg
                   atomically $
                     iopdInsert
                       (AttrByName "mac")
                       (EdhString mac)
                       (edh'scope'entity attrs)
-                  !boot <- loadNodeCfg world srcName src attrs
+                  !boot <- loadNodeCfg world (T.pack pfp) src attrs
                   -- record & return to Edh
                   atomically $ do
                     let !ncfg = NodeCfg src tsFile attrs boot
@@ -171,19 +170,6 @@ createNodeRegClass !clsOuterScope =
 
         exitWithCfg !ncfg = runEdhTx ets $ wrapNodeCfg ncfg $ exitEdhTx exit
 
-        cfgFileName = T.map fsMapChar mac <> ".edh"
-        fsMapChar = \case
-          ':' -> '-'
-          '/' -> '-'
-          '<' -> '-'
-          '>' -> '-'
-          '$' -> '-'
-          '\'' -> '-'
-          '\"' -> '-'
-          '?' -> '-'
-          '!' -> '-'
-          c -> c
-
     nregKnownNodesProc :: EdhHostProc
     nregKnownNodesProc !exit !ets = withThisHostObj ets $ \(nreg :: NodeReg) ->
       iopdToList (node'cfg'reg nreg) >>= runEdhTx ets . yieldNext
@@ -192,6 +178,38 @@ createNodeRegClass !clsOuterScope =
         yieldNext [] = exitEdhTx exit nil
         yieldNext ((_mac, !cfg) : rest) = wrapNodeCfg cfg $ \ !cfgVal ->
           edhYield cfgVal (const $ yieldNext rest) exit
+
+prepareNodeCfg ::
+  EdhThreadState -> NodeReg -> Text -> STM (FilePath, Scope, Maybe NodeCfg)
+prepareNodeCfg ets !nreg !mac = do
+  let !pfp = cfgFilePathOf nreg mac
+      srcName = T.pack pfp
+  iopdLookup mac (node'cfg'reg nreg) >>= \case
+    Just !ncfg -> return (pfp, node'cfg'attrs ncfg, Just ncfg)
+    Nothing -> do
+      !sb <- newSandbox ets
+      let !sbp =
+            (edh'scope'proc sb)
+              { edh'procedure'decl =
+                  ProcDecl
+                    { edh'procedure'addr =
+                        AttrAddrSrc (NamedAttr srcName) noSrcRange,
+                      edh'procedure'args =
+                        NullaryReceiver,
+                      edh'procedure'body =
+                        StmtSrc VoidStmt noSrcRange,
+                      edh'procedure'loc =
+                        SrcLoc (SrcDoc srcName) zeroSrcRange
+                    }
+              }
+      let !attrs = sb {edh'scope'proc = sbp}
+      return (pfp, attrs, Nothing)
+
+saveNodeCfg ::
+  FilePath -> EdhWorld -> Text -> Text -> Scope -> IO (Maybe ByteString)
+saveNodeCfg !pfp !world !srcName !src !attrs = do
+  B.writeFile pfp $ TE.encodeUtf8 src
+  loadNodeCfg world srcName src attrs
 
 loadNodeCfg :: EdhWorld -> Text -> Text -> Scope -> IO (Maybe ByteString)
 loadNodeCfg !world !srcName !src !attrs = do
@@ -219,3 +237,19 @@ loadNodeCfg !world !srcName !src !attrs = do
           >>= iopdUpdate effArts
         runEdhTx etsEffs $ pushEdhStack' attrs $ evalEdh srcName src endOfEdh
   readTVarIO result
+
+cfgFilePathOf :: NodeReg -> Text -> FilePath
+cfgFilePathOf !nreg !mac = node'reg'dir nreg </> cfgFileName
+  where
+    cfgFileName = fsMapChar <$> T.unpack mac <> ".edh"
+    fsMapChar = \case
+      ':' -> '-'
+      '/' -> '-'
+      '<' -> '-'
+      '>' -> '-'
+      '$' -> '-'
+      '\'' -> '-'
+      '\"' -> '-'
+      '?' -> '-'
+      '!' -> '-'
+      c -> c

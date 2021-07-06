@@ -1,6 +1,12 @@
 /**
- * Control Center
+ * Swarm Control Center
  */
+
+window.promptReboot = function promptReboot(ip, account) {
+  if (!window.confirm(`Reboot [${ip}] ?`)) return
+  window.alert('do reboot as: ' + account)
+}
+
 
 function getOffset(el) {
   var _x = 0;
@@ -42,7 +48,7 @@ function stopEditTextArea(ta) {
 const cnodeTable = document.getElementById("cnode_tbl");
 
 // double click on textareas
-cnodeTable.addEventListener("dblclick", function(evt) {
+cnodeTable.addEventListener("dblclick", function (evt) {
   const ta = evt.target;
   if ("TEXTAREA" !== ta.tagName) {
     return;
@@ -73,7 +79,7 @@ cnodeTable.addEventListener("dblclick", function(evt) {
 });
 
 // button click
-cnodeTable.addEventListener("click", async function(evt) {
+cnodeTable.addEventListener("click", async function (evt) {
   const btn = evt.target;
   if ("BUTTON" != btn.tagName) {
     return;

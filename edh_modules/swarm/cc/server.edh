@@ -25,6 +25,7 @@ export class SwarmController {
     # ctrl fields as well as metadata
     swarm = 'cn'
     user = 'dw'
+    admin = 'dwa'
 
     # this is always implanted automatically
     # note: use (=:) to just prototype it, but never overwrite it!
@@ -43,6 +44,10 @@ export class SwarmController {
     method login_link() {
       null(ip) -> 'javascript:alert("Compute node ['++ mac ++'] not booted!")'
       'ssh://' ++ user ++ '@' ++ ip
+    }
+
+    method admin_account() {
+      admin ++ '@' ++ ip
     }
 
     # make it bootable or not, mounting root fs from certain nfs server

@@ -25,8 +25,15 @@ effect {
       html.table()$ {
         html.thead()$ html.tr()$ {
 
-          html.th()$ 'MAC'
-          html.th()$ 'IP'
+          html.th()$ "Swarm"
+          html.th()$ "IP"
+
+          html.th()$ "Heartbeat"
+
+          html.th()$ "#CPU"
+          html.th()$ behave @tag'inner'html$ "RAM<br>(GB)"
+          html.th()$ behave @tag'inner'html$ "SWAP<br>(GB)"
+          html.th()$ "#PS"
 
           html.th()$ 'Config'
 
@@ -34,19 +41,47 @@ effect {
         html.tbody()$ do html.tr()$ {
 
           let (
-            mac, ip, vmem, cpuload, nps,
-            login_link,
+            swarm, mac, timestamp, ip, vmem, swap, cpuload, nps,
+            login_link, admin_account,
             **
           ) = cfgAttrs.attrs()
 
-          html.td()$ mac
-          html.td()$ {
+          html.td()$ swarm
+          html.td()$ html.div(style= "min-width: 120pt;")$ {
             behave @tag'inner'text$ ip
             html.br()
-            html.a(href= login_link())$ 'Login'
+            link = login_link()
+            html.div(title= link, style= "display: inline;")$ {
+              html.a(href= link)$ "LOGIN"
+            }
+            html.nbsp()
+            html.div(title= "Reboot the node", style= "display: inline;")$ {
+              html.button(
+                onclick= "promptReboot('"++ ip ++"', '"++ admin_account() ++"')"
+              )$ "REBOOT"
+            }
           }
 
-          html.td()$ html.textarea(readonly= '', cols=38, rows= 2,)$ cfgSrc
+          html.td()$ timestamp
+
+          html.td()$ str$ len$ cpuload
+          html.td()$ str$ (
+            (vmem["available"]/1024**3).ceil
+            ++ " / " ++
+            (vmem["total"]/1024**3).ceil
+          )
+          html.td()$ str$(
+            (swap["free"]/1024**3).ceil
+            ++ " / " ++
+            (swap["total"]/1024**3).ceil
+          )
+          html.td()$ str$nps
+
+          html.td()$ {
+            behave @tag'inner'text$ mac
+            html.br()
+            html.textarea(readonly= '', cols=38, rows= 2,)$ cfgSrc
+          }
 
         } for@ ( src as cfgSrc, attrs as cfgAttrs, ** )
         from perform knownNodes()

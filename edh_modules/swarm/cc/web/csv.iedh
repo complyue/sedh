@@ -1,0 +1,27 @@
+
+writeText = perform writeText
+method csvLine(*cells) { writeText$
+  ','.join(*()=< do json$str$ cell for cell from cells)
+  ++ '\n' }
+
+
+perform setContentType('text/csv')
+csvLine(
+  "Swarm", "IP", "Heartbeat", "#CPU",
+  "RAM Available", "RAM Total",
+  "SWAP Free", "SWAP Total",
+  "#PS", "MAC",
+)
+for@ ( attrs as cfgAttrs, ** ) from perform knownNodes() do {
+  let (
+    swarm, mac, timestamp, ip, vmem, swap, cpuload, nps,
+    **
+  ) = cfgAttrs.attrs()
+
+  csvLine(
+    swarm, ip, timestamp, len(cpuload),
+    (vmem["available"]/1024**3).ceil, (vmem["total"]/1024**3).ceil,
+    (swap["free"]/1024**3).ceil, (swap["total"]/1024**3).ceil,
+    nps, mac,
+  )
+}

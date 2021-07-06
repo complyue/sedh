@@ -18,7 +18,13 @@ effect {
 
   method body'content() {
 
-    html.h3()$ perform title
+    html.h3()$ {
+      behave @tag'inner'text$ perform title
+      html.nbsp()
+      html.span(style= "font-size: 70%;")${
+        html.a(href= '/cnodes.csv')$ 'download csv'
+      }
+    }
 
     html.table(id= "cnode_tbl")$ {
       html.thead()$ html.tr()$ {

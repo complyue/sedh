@@ -75,7 +75,7 @@ cnodeTable.addEventListener("dblclick", async function (evt) {
 // button click
 cnodeTable.addEventListener("click", async function (evt) {
   const btn = evt.target
-  if ("BUTTON" != btn.tagName) {
+  if ("BUTTON" !== btn.tagName) {
     return
   }
   const cfe = btn.closest("div.CfgEdit")

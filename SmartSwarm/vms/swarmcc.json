@@ -1,0 +1,33 @@
+{
+  "alias": "swarmcc",
+  "hostname": "swarmcc",
+  "brand": "joyent-minimal",
+  "image_uuid": "800db35c-5408-11eb-9792-872f658e7911",
+  "autoboot": true,
+  "max_physical_memory": 8000,
+  "quota": 20,
+  "resolvers": [
+    "223.5.5.5",
+    "119.29.29.29"
+  ],
+  "nics": [
+    {
+      "nic_tag": "admin",
+      "dhcp_server": true,
+      "allow_dhcp_spoofing": true,
+      "allow_ip_spoofing": true,
+      "allow_mac_spoofing": true,
+      "allow_restricted_traffic": true,
+      "allow_unfiltered_promisc": true,
+      "ip": "dhcp",
+      "primary": 1
+    }
+  ],
+  "filesystems": [
+    {
+      "source": "/swarmcc",
+      "target": "/swarmcc",
+      "type": "lofs"
+    }
+  ]
+}

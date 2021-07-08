@@ -8,6 +8,7 @@
 - [Setup Procedure](#setup-procedure)
   - [OS Install](#os-install)
   - [Advised Performance Tweaks](#advised-performance-tweaks)
+  - [(Optional) Turn the Controller into an NTP Server](#optional-turn-the-controller-into-an-ntp-server)
   - [Setup a Zone for Swarm Control Center](#setup-a-zone-for-swarm-control-center)
   - [Done](#done)
 
@@ -46,6 +47,33 @@ https://wiki.smartos.org/install
 
 ```console
 zfs set sync=disabled dedup=on compress=on atime=off zones
+```
+
+### (Optional) Turn the Controller into an NTP Server
+
+All machines of the swarm should ideally have their system time closely sync'ed, and for HPC scenario, you'd better have a local time server instead of one on the internet. Though a bit hacky, SmartOS can be tweaked to assuming a time server role.
+
+```console
+[root@smartvm ~]# cd /usbkey
+[root@smartvm /usbkey]# mkdir config.inc
+[root@smartvm /usbkey]# cp /etc/inet/ntp.conf config.inc/
+[root@smartvm /usbkey]# vi config.inc/ntp.conf
+[root@smartvm /usbkey]# diff /etc/inet/ntp.conf config.inc/ntp.conf
+0a1,5
+> # add a line `ntp_conf_file=ntp.conf` to /usbkey/config
+> # so this file (/usbkey/config.inc/ntp.conf) is copied
+> # to /etc/inet/ntp.conf at each boot
+>
+>
+5,6c10,12
+< restrict default ignore
+< restrict -6 default ignore
+---
+> # NO, don't ignore, so this node serves as an NTP server
+> #restrict default ignore
+> #restrict -6 default ignore
+[root@smartvm /usbkey]# echo 'ntp_conf_file=ntp.conf' >> /usbkey/config
+[root@smartvm /usbkey]# reboot
 ```
 
 ### Setup a Zone for Swarm Control Center

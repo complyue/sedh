@@ -21,7 +21,7 @@ import Prelude
 
 data NodeReg = NodeReg
   { node'reg'dir :: !FilePath,
-    node'cfg'default :: !Text,
+    node'cfg'default :: !(Text, TVar (EpochTime, Text)),
     node'cfg'reg :: !(IOPD NodeKey NodeCfg)
   }
 
@@ -85,11 +85,11 @@ createNodeRegClass !clsOuterScope =
                   throwEdh etsCtor UsageError $
                     "node registry dir not existing: " <> T.pack regDirPath
               True -> do
+                !defVar <- newTVarIO (0, "")
                 !reg <- iopdEmptyIO
-                atomically $
-                  ctorExit Nothing $
-                    HostStore $
-                      toDyn $ NodeReg regDirPath cfgDefaultText reg
+                let !nreg = NodeReg regDirPath (cfgDefaultText, defVar) reg
+                _ <- prepareDefaultCfg nreg
+                atomically $ ctorExit Nothing $ HostStore $ toDyn nreg
 
     nregReprProc :: EdhHostProc
     nregReprProc !exit !ets =
@@ -128,7 +128,6 @@ createNodeRegClass !clsOuterScope =
           edhContIO $ do
             try (modificationTime <$> getFileStatus pfp) >>= \case
               Left (_errRead :: IOError) -> do
-                let !src = node'cfg'default nreg
                 -- assuming non-existing, try write fresh. the write should fail
                 -- similarly to stat, due to other IO problems, e.g. permission,
                 -- fs corruption etc. and such errors in writting the file will
@@ -138,6 +137,7 @@ createNodeRegClass !clsOuterScope =
                     (AttrByName "mac")
                     (EdhString mac)
                     (edh'scope'entity attrs)
+                !src <- prepareDefaultCfg nreg
                 !boot <- saveNodeCfg pfp world (T.pack pfp) src attrs
                 -- get file mod time after written
                 !tsFile <- modificationTime <$> getFileStatus pfp
@@ -182,7 +182,7 @@ createNodeRegClass !clsOuterScope =
 prepareNodeCfg ::
   EdhThreadState -> NodeReg -> Text -> STM (FilePath, Scope, Maybe NodeCfg)
 prepareNodeCfg ets !nreg !mac = do
-  let !pfp = cfgFilePathOf nreg mac
+  let !pfp = cfgFilePathOf (node'reg'dir nreg) mac
       srcName = T.pack pfp
   iopdLookup mac (node'cfg'reg nreg) >>= \case
     Just !ncfg -> return (pfp, node'cfg'attrs ncfg, Just ncfg)
@@ -204,6 +204,28 @@ prepareNodeCfg ets !nreg !mac = do
               }
       let !attrs = sb {edh'scope'proc = sbp}
       return (pfp, attrs, Nothing)
+
+prepareDefaultCfg :: NodeReg -> IO Text
+prepareDefaultCfg !nreg = do
+  let (!defSrc, !defVar) = node'cfg'default nreg
+      !pfpDefault = cfgFilePathOf (node'reg'dir nreg) "default"
+  try (modificationTime <$> getFileStatus pfpDefault) >>= \case
+    Left (_errRead :: IOError) -> do
+      -- write default node cfg file, assuming non-existence,
+      -- other problems will err out in our attempt in writting
+      B.writeFile pfpDefault $ TE.encodeUtf8 defSrc
+      -- get file mod time after written
+      !tsFile <- modificationTime <$> getFileStatus pfpDefault
+      atomically $ writeTVar defVar (tsFile, defSrc)
+      return defSrc
+    Right !tsFile -> do
+      (tsLoaded, srcLoaded) <- readTVarIO defVar
+      if tsLoaded >= tsFile
+        then return srcLoaded
+        else do
+          !src <- TE.decodeUtf8 <$> B.readFile pfpDefault
+          atomically $ writeTVar defVar (tsFile, src)
+          return src
 
 saveNodeCfg ::
   FilePath -> EdhWorld -> Text -> Text -> Scope -> IO (Maybe ByteString)
@@ -238,8 +260,8 @@ loadNodeCfg !world !srcName !src !attrs = do
         runEdhTx etsEffs $ pushEdhStack' attrs $ evalEdh srcName src endOfEdh
   readTVarIO result
 
-cfgFilePathOf :: NodeReg -> Text -> FilePath
-cfgFilePathOf !nreg !mac = node'reg'dir nreg </> cfgFileName
+cfgFilePathOf :: FilePath -> Text -> FilePath
+cfgFilePathOf !regDir !mac = regDir </> cfgFileName
   where
     cfgFileName = fsMapChar <$> T.unpack mac <> ".edh"
     fsMapChar = \case

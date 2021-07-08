@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
-<service_bundle type='manifest' name='swarm6780'>
-  <service name='swarm/ctrl6780' type='service' version='0'>
+<service_bundle type='manifest' name='booter'>
+  <service name='swarm/booter' type='service' version='0'>
     <create_default_instance enabled='true' />
     <single_instance />
     <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
@@ -10,16 +10,18 @@
     <dependency name='net' grouping='require_all' restart_on='none' type='service'>
       <service_fmri value='svc:/network/loopback' />
     </dependency>
-    <exec_method name='start' type='method' exec="bash -c 'pkill swarmcc; ctrun /opt/local/bin/epm x swarmcc &amp;'" timeout_seconds='60'>
+    <dependent name='m3c3' restart_on='none' grouping='optional_all'>
+      <service_fmri value='svc:/milestone/multi-user' />
+    </dependent>
+    <exec_method name='start' type='method' exec="bash -c 'ctrun /swarmcc/bin/pixiecore api http://127.0.0.1:6780/pixie &amp;'" timeout_seconds='60'>
       <method_context working_directory='/swarmcc'>
         <method_credential user='root' group='root' />
         <method_environment>
           <envvar name='LANG' value='C.UTF-8' />
-          <envvar name='EDH_LOG_LEVEL' value='INFO' />
         </method_environment>
       </method_context>
     </exec_method>
-    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='60'>
+    <exec_method name='stop' type='method' exec='pkill pixiecore' timeout_seconds='60'>
       <method_context />
     </exec_method>
   </service>

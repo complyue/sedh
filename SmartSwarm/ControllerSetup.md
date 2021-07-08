@@ -8,8 +8,8 @@
 - [Setup Procedure](#setup-procedure)
   - [OS Install](#os-install)
   - [Advised Performance Tweaks](#advised-performance-tweaks)
-  - [Prepare Filesystems](#prepare-filesystems)
-  - [Setup a Swarm Controller Zone](#setup-a-swarm-controller-zone)
+  - [Setup a Zone for Swarm Control Center](#setup-a-zone-for-swarm-control-center)
+  - [Done](#done)
 
 ## Advisories
 
@@ -48,38 +48,15 @@ https://wiki.smartos.org/install
 zfs set sync=disabled dedup=on compress=on atime=off zones
 ```
 
-### Prepare Filesystems
+### Setup a Zone for Swarm Control Center
 
-- For swarm controller
+- Create a filesystem
 
-> It'll run as a native zone, a separate ZFS filesystem will be used to store software & configurations for the `Swarm Control Center` service
-
-```console
-zfs create -o mountpoint=/swarmcc -o quota=20G -o reservation=6G zones/swarmcc
-```
-
-- For swarm workers (computing nodes)
-
-> The worker machines will run diskless, i.e. net booted into Linux with `NFS` mounted, shared, readonly root filesystem, and other writable filesystems shared
-
-> Several ZFS filesystems are to be created for the run of worker machines, including:
-
-- The usually readonly root filesystem
-- The shared, usually writable `/var` filesystem
-- The shared writable filesystem to persist swap files per worker machine
-- The shared writable workspace to store artifacts as payload of swarm works
-
-> Change the network address and quota/reservation per your needs
+> The `Swarm Control Center` service will run in a native zone, this separate ZFS filesystem will be used to store its software components & configurations
 
 ```console
-zfs create -o mountpoint=/cnroot -o sharenfs=root=@10.0.0.0/8 -o quota=20G -o reservation=10G zones/cnroot
-zfs create -o mountpoint=/cnvar -o sharenfs=root=@10.0.0.0/8 -o quota=20G -o reservation=10G zones/cnvar
-zfs create -o mountpoint=/cnswap -o sharenfs=root=@10.0.0.0/8 -o quota=80G -o reservation=60G zones/cnswap
-zfs create -o mountpoint=/cnwkspc -o sharenfs=root=@10.0.0.0/8 -o quota=80G -o reservation=60G zones/cnwkspc
-
+zfs create -o mountpoint=/swarmcc -o quota=2G -o reservation=100M zones/swarmcc
 ```
-
-### Setup a Swarm Controller Zone
 
 - Import the latest `minimal-64` zone image
 
@@ -294,16 +271,25 @@ Resolving deltas: 100% (4345/4345), done.
 ```
 
 ```console
-[root@swarmcc /swarmcc/edh-universe]# epm x cabal install sedh:exes
+[root@swarmcc /swarmcc/edh-universe]# epm x cabal install sedh
  ℹ️   >> Managing packages at EPM home [/swarmcc] <<
 Wrote tarball sdist to
 /swarmcc/edh-universe/dist-newstyle/sdist/nedh-0.1.0.0.tar.gz
 Wrote tarball sdist to
 /swarmcc/edh-universe/dist-newstyle/sdist/elr-0.3.0.0.tar.gz
+Wrote tarball sdist to
+/swarmcc/edh-universe/dist-newstyle/sdist/edh-0.3.0.0.tar.gz
+Wrote tarball sdist to
+/swarmcc/edh-universe/dist-newstyle/sdist/lossless-decimal-0.3.0.0.tar.gz
+Wrote tarball sdist to
+/swarmcc/edh-universe/dist-newstyle/sdist/sedh-0.1.0.0.tar.gz
+Wrote tarball sdist to
+/swarmcc/edh-universe/dist-newstyle/sdist/network-3.1.2.2.tar.gz
+Resolving dependencies...
   ...
+Symlinking 'gwd'
 Symlinking 'swarmcc'
 Symlinking 'forage'
-Symlinking 'gwd'
 [root@swarmcc /swarmcc/edh-universe]#
 ```
 
@@ -312,47 +298,109 @@ Symlinking 'gwd'
 ```console
 [root@swarmcc /swarmcc/edh-universe]# cd ..
 [root@swarmcc /swarmcc]# mkdir etc
-[root@swarmcc /swarmcc]# epm x swarmcc
- ℹ️   >> Managing packages at EPM home [/swarmcc] <<
-ℹ️  /swarmcc/edh-universe/e-wrks/nedh/edh_modules/net/repl.edh:18:24
-Đ (Edh) web REPL listening: ws://127.0.0.1:2721
-ℹ️  /swarmcc/edh-universe/e-wrks/nedh/edh_modules/net/repl.edh:41:20
-Đ (Edh) web REPL listening: http://127.0.0.1:2714
-ℹ️  /swarmcc/edh-universe/e-wrks/sedh/edh_modules/swarm/cc/server.edh:93:24
-Swarm Control Center listening: http://0.0.0.0:6780
-ℹ️  /swarmcc/edh-universe/e-wrks/sedh/edh_modules/swarm/cc/server.edh:106:24
-Swarm Control Center sniffing udp://0.0.0.0:6768 for cnode heartbeating.
-^CEdh program crashed with an error:
+[root@swarmcc /swarmcc]# cat smf/swarm/cc.xml
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<service_bundle type='manifest' name='swarmcc'>
+  <service name='swarm/cc' type='service' version='0'>
+    <create_default_instance enabled='true' />
+    <single_instance />
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/local' />
+    </dependency>
+    <dependency name='net' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/loopback' />
+    </dependency>
+    <exec_method name='start' type='method' exec="bash -c 'pkill swarmcc; ctrun /opt/local/bin/epm x swarmcc &amp;'" timeout_seconds='60'>
+      <method_context working_directory='/swarmcc'>
+        <method_credential user='root' group='root' />
+        <method_environment>
+          <envvar name='LANG' value='C.UTF-8' />
+          <envvar name='EDH_LOG_LEVEL' value='INFO' />
+        </method_environment>
+      </method_context>
+    </exec_method>
+    <exec_method name='stop' type='method' exec='pkill swarmcc' timeout_seconds='60'>
+      <method_context />
+    </exec_method>
+  </service>
+</service_bundle>
 
-💔 traceback
-📜 module:swarm/cc 👉 /swarmcc/edh_modules/swarm/cc/__main__.edh:7:1-7:11
-📜 join 👉 /swarmcc/edh-universe/e-wrks/sedh/edh_modules/swarm/cc/server.edh:233:5-233:21
-🛑 Ctrl^C pressed
-
-[root@swarmcc /swarmcc]# 
-
+[root@swarmcc /swarmcc]# svccfg import smf/swarm/cc.xml
+[root@swarmcc /swarmcc]# svcadm enable cc
+[root@swarmcc /swarmcc]# svcs -x cc
+svc:/swarm/cc:default (?)
+ State: online since Thu Jul  8 08:58:22 2021
+   See: /var/svc/log/swarm-cc:default.log
+Impact: None.
+[root@swarmcc /swarmcc]#
 ```
 
-```console
+- Install & configure Pixiecore
 
+  https://github.com/danderson/netboot/tree/master/pixiecore
+
+```console
+[root@swarmcc /swarmcc]# mkdir bin
+[root@swarmcc /swarmcc]# GOBIN=/swarmcc/bin go get go.universe.tf/netboot/cmd/pixiecore
+go: downloading go.universe.tf/netboot v0.0.0-20210617221821-fc2840fa7b05
+  ...
+go: downloading golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+[root@swarmcc /swarmcc]#
+[root@swarmcc /swarmcc]# cat smf/swarm/booter.xml
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<service_bundle type='manifest' name='booter'>
+  <service name='swarm/booter' type='service' version='0'>
+    <create_default_instance enabled='true' />
+    <single_instance />
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/local' />
+    </dependency>
+    <dependency name='net' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/loopback' />
+    </dependency>
+    <dependent name='m3c3' restart_on='none' grouping='optional_all'>
+      <service_fmri value='svc:/milestone/multi-user' />
+    </dependent>
+    <exec_method name='start' type='method' exec="bash -c 'ctrun /swarmcc/bin/pixiecore api http://127.0.0.1:6780/pixie &amp;'" timeout_seconds='60'>
+      <method_context working_directory='/swarmcc'>
+        <method_credential user='root' group='root' />
+        <method_environment>
+          <envvar name='LANG' value='C.UTF-8' />
+        </method_environment>
+      </method_context>
+    </exec_method>
+    <exec_method name='stop' type='method' exec='pkill pixiecore' timeout_seconds='60'>
+      <method_context />
+    </exec_method>
+  </service>
+</service_bundle>
+
+[root@swarmcc /swarmcc]# svccfg import smf/swarm/booter.xml
+[root@swarmcc /swarmcc]# svcadm enable booter
+[root@swarmcc /swarmcc]# svcs -x booter
+svc:/swarm/booter:default (?)
+ State: online since Thu Jul  8 09:20:34 2021
+   See: /var/svc/log/swarm-booter:default.log
+Impact: None.
+[root@swarmcc /swarmcc]#
 ```
 
-```console
+### Done
 
-```
-
-```console
-
-```
+Check the services are online
 
 ```console
+[root@swarmcc /swarmcc]# svcs -x cc booter
+svc:/swarm/cc:default (?)
+ State: online since Thu Jul  8 08:58:22 2021
+   See: /var/svc/log/swarm-cc:default.log
+Impact: None.
 
-```
-
-```console
-
-```
-
-```console
-
+svc:/swarm/booter:default (?)
+ State: online since Thu Jul  8 09:22:59 2021
+   See: /var/svc/log/swarm-booter:default.log
+Impact: None.
+[root@swarmcc /swarmcc]#
 ```

@@ -1,7 +1,21 @@
-{## this is the entry module of Đ Swarm Control Center #}
+{## Entry module of Swarm Control Center #}
 
 import * 'swarm/cc'
+
+# the cfg module is separately customizable when running in a nested EPM Home
 import * as cfg 'swarm/cc/config'
 
+# start all necessary services
 scc = SwarmController(**cfg)
-scc.join()
+
+# keep the server process running
+if debug then {
+  import * 'swarm/cc/debug'
+
+  # show session count and url list every 5 minutes
+  do sccDebug.logSessions()
+  for _ from console.everySeconds( 300 )
+
+} else {
+  scc.join()
+}

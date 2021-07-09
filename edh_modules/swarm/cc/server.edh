@@ -75,7 +75,7 @@ export class SwarmController {
     {## Registry of all nodes #}
     this.nreg = NodeReg( that.CNODE_CFG_TMPL.deBlock, regDir= regDir, )
 
-    {## Serving PixieApi & management page over http #}
+    {## Serving PixieApi, management page, and various browser-facing API endpoints over http #}
     this.http = HttpServer(
       that.WEB_MODULES,
       addr= httpInterface, port= httpPort,
@@ -86,7 +86,7 @@ export class SwarmController {
         'cnode/v1/load/:mac': that.cfgLoadApi,
         'cnodes.csv': that.csvDownload,
       } =< that.URL_ROUTES,
-      front= this.managementPage,
+      front= that.managementPage,
     )
     case this.http.addrs() of {
       { httpAddr :> _extraHttpAddrs } -> {
@@ -212,15 +212,15 @@ export class SwarmController {
           continue
         }
         case hbd['heartbeat'] of {
-          { meta } | type(meta) is 'Dict' -> pass
+          { hb'attrs } | type(hb'attrs) is 'Dict' -> pass
           console.warn<| 'Unexpected heartbeat payload:\n' ++ hbd
           continue
         }
 
         let ( attrs, ** ) = this.nreg.cfgOf(mac)
-        {## it's a sandboxed scope, meant to be updated by heartbeats from booted node #}
+        {## it's a sandboxed scope, meant to be updated by heartbeats from the booted node #}
         attrs =: scope()
-        attrs.put(**meta)
+        attrs.put(**hb'attrs)
       }
 
     @} $=> { exc } -> {

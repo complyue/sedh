@@ -181,7 +181,7 @@ export class SwarmController {
     perform setContentType('text/plain')
     let ( account, ** ) = perform rqParams
     case system(
-      "ssh " ++ account ++ " 'sudo reboot'"
+      "ssh -o StrictHostKeyChecking=no " ++ account ++ " 'sudo reboot'"
     ) of {
       { errCode } -> {
         # destined to err out as the ssh connection will be forcefully disconnected immediately,

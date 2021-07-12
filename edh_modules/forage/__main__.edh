@@ -1,14 +1,10 @@
-
-# this is the entry module of an Edh Swarm Forager
+{## Entry module of an Đ Swarm Forager #}
 
 import * 'swarm/forager'
 
-sniffer = forageOn(
-  2, # headcount - number of worker processes to vend
-  '', # targetPrefix - prefix to filter out uninteresting work
-  # local addr to sniff for call-for-workers announced to the swarm
-  '127.0.0.1', 3722,
-)
-
-# keep the forager process running
-sniffer.join()
+forageOn(
+  heartcount= 1, # number of worker processes to vend
+  targetPrefix = '', # prefix to filter out uninteresting work
+  swarmAddr = '0.0.0.0', # local addr to sniff for call-for-workers
+  swarmPort = 3722, # local port to sniff for call-for-workers
+).join()

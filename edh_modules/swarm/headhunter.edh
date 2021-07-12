@@ -107,15 +107,42 @@ export class HeadHunter {
     this.finishingUp = sink # signal of no more jobs, i.e. to start finishing up
 
     go {
-      hh = this; # alias self
-      server = Server(
-        'swarm/headhunter', # the service module
-        perform swarmIface $=> '0.0.0.0', # local addr to bind
-        0, # local port to bind
-        init= modu => { # per-connection peer module initialization
-          import * hh into modu
-        },
-      )
+      effect default swarmIface = '0.0.0.0'
+      let server = Server(
+        addr= perform swarmIface, # local addr to bind
+        port= 0, # local port to bind
+        useSandbox= false, # trade security mitigation for simplicity
+      ) $@ () => {
+        import * that
+
+        peer = perform @netPeer
+        peer =: Peer()
+        console.debug<| 'Swarm forager/worker connected - ' ++ peer
+        defer {
+          console.debug<| 'Disconnecting swarm forager/worker ' ++ peer
+        }
+
+        effect {
+          ; @dataSink = peer.armChannel( dataChan ?:= 'data' )
+        }
+
+        {
+
+          while peer.eol() is false case peer.readCommand() of {
+            # sequence of commands each resulting in nil are expected and let pass here
+            { cmdVal } -> {
+              console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
+              cmdVal = nil # clear it
+            }
+          }
+
+        } @=> { exc } -> {
+          console.warn<| 'Exception by swarm forager/worker ' ++ peer
+          ++ ' error: ' ++ exc
+        }
+
+      }
+      server =: Server()
       case server.addrs() of {
         { wsAddr :>_ } -> console.info<| 'HeadHunter listening: ' ++ wsAddr
         # or the network has failed, propagate the error

@@ -23,6 +23,8 @@ export class WSC {
     workModu as this.workModu,
     priority as this.priority,
   ) {
+    this.forager =: Forager()
+
     # headcount reserved for this worksource
     this.hcReserved = 0
     # headcount hired by the worksource, updated from the worksource,
@@ -53,13 +55,6 @@ export class WSC {
   method engage ( hcAvailable ) {
     this.hcReserved = min( hcAvailable, this.hcPlanned )
 
-    # artifacts should be implanted into the worksource facing, negotiator
-    # module
-    namespace nego'arts ( wsc = this ) export {
-      wsc = wsc # for it to be exported thus to be implanted with the name
-      import * wsc # re-export the exports
-    }
-
     {
 
       go { # do the negotiation on a separate thread, don't block the forager from comm with other worksources concurrently
@@ -68,12 +63,52 @@ export class WSC {
         defer this.stop()
 
         # make the connection
-        clnt = Client(
-          this.forager.negoModu, this.addr,
-          init= modu => {
-            import * nego'arts into modu
-          },
-        )
+        let clnt = Client(
+          addrSpec= this.addr,
+          useSandbox= false, # trade security mitigation for simplicity
+        ) $@ () => {
+          import * that # expose all exported instance methods
+
+          peer = perform @netPeer
+          peer =: Peer()
+          console.debug<| 'Swarm forager negotiating with worksource - ' ++ peer
+          defer {
+            console.debug<| 'Disconnecting worksource ' ++ peer
+          }
+
+          effect {
+            ; @dataSink = peer.armChannel( dataChan, this.hcEmployed )
+          }
+
+
+          # we'll identify ourself as a forager to the worksource, as soon as the WSC is ready to receive employment confirmation events from the channel sink
+          ; (outlet= this.hcEmployed )|() =>* peer.postCommand( expr
+
+            OfferHeads( {$ senv.swarmManagerPid $}, {$ this.hcReserved $} )
+
+          )
+
+          # start the team keeper, it'll subscribe to this.hcEmployed, thus to kick off the producer above
+          that.startTeamKeeper()
+
+
+          {
+
+            while peer.eol() is false case peer.readCommand() of {@
+              # sequence of commands each resulting in nil are expected and let pass here
+              { cmdVal } -> {
+                console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  '
+                ++ desc(cmdVal)
+              }
+            @}
+
+          } $=> { exc } -> {
+            console.error<| 'Exception by worksource ' ++ peer ++ ' error: '
+            ++ desc(exc)
+          }
+
+        }
+        clnt =: Client()
         # note @.addrs()@ will wait until it's connected or failed
         case clnt.addrs() of { addr :>_ }
         -> console.debug<| 'Connected to worksource at: ' ++ addr
@@ -87,7 +122,7 @@ export class WSC {
       }
 
       # register this wsc to the forager
-      this.forager.wsd[ this.key() ] = this
+      this.forager.wsd[ this.key() ] = that
 
     } $=> { exc } -> { # this can catch exceptions occurred synchronously, or more probably in case here, asynchronously on the forked negotiating thread
       console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
@@ -172,10 +207,7 @@ export class WSC {
 
 export class Forager {
 
-  method __init__(
-    headcount as this.headcount,
-    negoModu as this.negoModu = 'swarm/negotiator',
-  ) {
+  method __init__( headcount as this.headcount, ) {
     this.headcount >= 1 or error( 'Invalid headcount: ' ++this.headcount )
     this.hdIdle = this.headcount
 

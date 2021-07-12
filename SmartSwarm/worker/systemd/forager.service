@@ -1,0 +1,21 @@
+[Unit]
+Description=Swarm Forager
+Requires=
+
+[Service]
+User=dw
+Group=dwa
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+StartLimitInterval=5
+StartLimitBurst=10
+
+WorkingDirectory=/workspace
+ExecStart=/workspace/.local/bin/epm exec forage
+
+Restart=always
+RestartSec=120
+
+[Install]
+WantedBy=multi-user.target

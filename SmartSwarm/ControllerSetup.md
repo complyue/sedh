@@ -388,9 +388,6 @@ go: downloading golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
     <dependency name='net' grouping='require_all' restart_on='none' type='service'>
       <service_fmri value='svc:/network/loopback' />
     </dependency>
-    <dependent name='m3c3' restart_on='none' grouping='optional_all'>
-      <service_fmri value='svc:/milestone/multi-user' />
-    </dependent>
     <exec_method name='start' type='method' exec="bash -c 'ctrun /swarmcc/bin/pixiecore api http://127.0.0.1:6780/pixie &amp;'" timeout_seconds='60'>
       <method_context working_directory='/swarmcc'>
         <method_credential user='root' group='root' />

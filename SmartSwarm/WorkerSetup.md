@@ -139,7 +139,7 @@ apt -y purge nplan netplan.io
 Install additional utilities & libraries
 
 ```bash
-apt install git htop bmon nfs-common uuid curl libgmp-dev libtinfo-dev
+apt install git nfs-common uuid curl python3-psutil libgmp-dev libtinfo-dev
 ```
 
 Configure time sync to a local time server

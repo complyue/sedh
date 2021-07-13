@@ -27,6 +27,7 @@ effect default {
 html.html()$ {
 
   html.head()$ {
+    html.meta(charset= 'UTF-8')
     html.title()$ {
       perform @tag'inner'text$ perform title
     }

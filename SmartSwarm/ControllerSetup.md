@@ -214,7 +214,7 @@ pkg_summary.xz                                   100% 2416KB  51.4KB/s   00:47
 - Install Git, GCC, GHC, Cabal-install, Go
 
 ```console
-[root@swarmcc ~]# pkgin in git gcc9 ghc cabal-install go
+[root@swarmcc ~]# pkgin in git gcc9 ghc cabal-install go automake
 calculating dependencies...done.
  ...
 proceed ? [Y/n]
@@ -277,25 +277,25 @@ Resolving deltas: 100% (804/804), done.
 [root@swarmcc /swarmcc]# cd edh-universe/
 ```
 
-- Install patched `network` to workaround the compilation errors
+- Install bleeding edge of `network` to workaround the compilation errors
 
-> You don't do this once https://github.com/haskell/network/issues/506 get solved
+> https://github.com/haskell/network/issues/507 has been merged, you don't need to do this once the next release on Hackage got it included
 
 ```console
-[root@swarmcc /swarmcc/edh-universe]# epm i -b fix506 https://github.com/complyue/network.git
+[root@swarmcc /swarmcc/edh-universe]# epm i https://github.com/haskell/network.git
  ℹ️   >> Managing packages at EPM home [/swarmcc] <<
- ℹ️  Installing https://github.com/complyue/network.git to edh-universe/complyue/network ...
-Cloning into 'edh-universe/complyue/network'...
+ ℹ️  Installing https://github.com/haskell/network.git to edh-universe/haskell/network ...
+Cloning into 'edh-universe/haskell/network'...
 remote: Enumerating objects: 7582, done.
 remote: Counting objects: 100% (84/84), done.
 remote: Compressing objects: 100% (56/56), done.
 remote: Total 7582 (delta 31), reused 62 (delta 22), pack-reused 7498
 Receiving objects: 100% (7582/7582), 1.81 MiB | 516.00 KiB/s, done.
 Resolving deltas: 100% (4345/4345), done.
- ℹ️  Installed https://github.com/complyue/network.git .
-[root@swarmcc /swarmcc/edh-universe]# cd complyue/network/
-[root@swarmcc /swarmcc/edh-universe/complyue/network]# autoreconf
-[root@swarmcc /swarmcc/edh-universe/complyue/network]# cd ../..
+ ℹ️  Installed https://github.com/haskell/network.git .
+[root@swarmcc /swarmcc/edh-universe]# cd haskell/network/
+[root@swarmcc /swarmcc/edh-universe/haskell/network]# autoreconf
+[root@swarmcc /swarmcc/edh-universe/haskell/network]# cd ../..
 ```
 
 ```console

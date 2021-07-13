@@ -15,7 +15,7 @@ function startEditTextArea(ta) {
   const pst = cfe.style
   pst.width = "" + Math.max(640, Math.min(1200, 36 + ta.scrollWidth)) + "px"
   pst.height = "" + Math.max(200, Math.min(700, 36 + ta.scrollHeight)) + "px"
-  pst.position = "fixed"
+  pst.position = "absolute"
 
   ta.readOnly = false
   ta.focus()

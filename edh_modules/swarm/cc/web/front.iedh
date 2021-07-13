@@ -99,6 +99,8 @@ effect {
       from perform knownNodes()
     }
 
+    # enough margin at bottom, for editing textareas to expand without page height change
+    html.div(style= 'height: 800px;')$ pass
   }
 
   method body'end'scripts() {

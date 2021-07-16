@@ -104,6 +104,12 @@ Allow `sudo` without password verification for `dwa`, this is needed by _one-cli
 echo 'dwa ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dwa
 ```
 
+Tell `sudo` to not consult DNS servers
+
+```bash
+echo 'Defaults !fqdn' >> /etc/sudoers
+```
+
 Set a static hostname
 
 ```bash

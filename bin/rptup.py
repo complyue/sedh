@@ -32,7 +32,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
         .decode("utf-8")
         .splitlines()
     ):
-        mac_match = re.search("\s+link/ether (\S+)", line)
+        mac_match = re.search(r"\s+link/ether (\S+)", line)
         if mac_match:
             mac = mac_match.group(1)
             continue
@@ -40,7 +40,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as soc
         if mac is None:
             continue
 
-        ip_match = re.search("\s+inet (\S+)/", line)
+        ip_match = re.search(r"\s+inet (\S+)/", line)
         if ip_match:
             ip = ip_match.group(1)
 

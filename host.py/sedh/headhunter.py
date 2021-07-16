@@ -178,6 +178,7 @@ class HeadHunter:
             forager = Forager(peer, forager_pid)
             self.foragers[peer] = forager
         forager.hc_employed += hc2employ
+        self.hc_employed += hc2employ
         logger.debug(f"HH is hiring {forager.hc_employed} heads from {peer.ident} now.")
         await peer.p2c(DATA_CHAN, repr(forager.hc_employed))
 
@@ -245,7 +246,7 @@ class HeadHunter:
             if hc_employed != self.hc_employed:
                 logger.debug(f"HH has {hc_employed} heads employed now.")
                 self.hc_employed = hc_employed
-
+            logger.info(f"headcount-------------{self.headcount}  {hc_employed}")
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually

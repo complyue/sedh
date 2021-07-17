@@ -29,7 +29,7 @@ https://illumos.org/hcl
 
 - Install as many of HDDs (magnetic spinning disks) as possible, with one or more of them designated as hot spare
 - Go three way mirror, or else, normal mirror, forget about other RAID options
-- Optimize write performance with SSDs in case you need, though mind to leave more hot spares there
+- Optimize write performance by adding SSDs for ZIL, in case you need
 
 ### USB Stick Booting
 

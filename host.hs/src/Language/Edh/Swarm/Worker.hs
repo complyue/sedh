@@ -18,13 +18,10 @@ import Prelude
 
 waitAnyWorkerDoneProc :: EdhHostProc
 waitAnyWorkerDoneProc !exit !ets =
-  if edh'in'tx ets
-    then throwEdh ets UsageError "you don't wait within a transaction"
-    else
-      runEdhTx ets $
-        edhContIO $
-          waitAnyWorker
-            >>= atomically . exitEdh ets exit
+  runEdhTx ets $
+    edhContIO $
+      waitAnyWorker
+        >>= atomically . exitEdh ets exit
   where
     waitAnyWorker :: IO EdhValue
     waitAnyWorker =
@@ -70,45 +67,42 @@ wscStartWorkerProc
   (mandatoryArg -> !jobExecutable)
   (mandatoryArg -> workModu)
   !exit
-  !ets =
-    if edh'in'tx ets
-      then throwEdh ets UsageError "you don't start worker within a transaction"
-      else prepCmdl $ \ !wkrCmdl ->
-        serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
-          runEdhTx ets $
-            edhContIO $ do
-              let !hints =
-                    defaultHints
-                      { addrFlags = [AI_PASSIVE],
-                        addrSocketType = Stream
-                      }
-              addr : _ <-
-                getAddrInfo
-                  (Just hints)
-                  (Just $ T.unpack servAddr)
-                  (Just (show servPort))
-              bracket
-                ( socket
-                    (addrFamily addr)
-                    (addrSocketType addr)
-                    (addrProtocol addr)
-                )
-                close
-                $ \ !sock -> do
-                  connect sock (addrAddress addr)
-                  bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
-                    -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                    setFdOption (Fd wscFd) CloseOnExec False
-                    !wkrPid <- forkProcess $ do
-                      changeWorkingDirectory $ T.unpack workDir
-                      executeFile
-                        "/usr/bin/env"
-                        False
-                        (wkrCmdl ++ [T.unpack workModu, show wscFd])
-                        Nothing
-                    atomically $
-                      exitEdh ets exit $
-                        EdhDecimal $ fromIntegral wkrPid
+  !ets = prepCmdl $ \ !wkrCmdl ->
+    serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
+      runEdhTx ets $
+        edhContIO $ do
+          let !hints =
+                defaultHints
+                  { addrFlags = [AI_PASSIVE],
+                    addrSocketType = Stream
+                  }
+          addr : _ <-
+            getAddrInfo
+              (Just hints)
+              (Just $ T.unpack servAddr)
+              (Just (show servPort))
+          bracket
+            ( socket
+                (addrFamily addr)
+                (addrSocketType addr)
+                (addrProtocol addr)
+            )
+            close
+            $ \ !sock -> do
+              connect sock (addrAddress addr)
+              bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+                -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                setFdOption (Fd wscFd) CloseOnExec False
+                !wkrPid <- forkProcess $ do
+                  changeWorkingDirectory $ T.unpack workDir
+                  executeFile
+                    "/usr/bin/env"
+                    False
+                    (wkrCmdl ++ [T.unpack workModu, show wscFd])
+                    Nothing
+                atomically $
+                  exitEdh ets exit $
+                    EdhDecimal $ fromIntegral wkrPid
     where
       strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
       strSeq [] !sl exit' = exit' $ reverse sl

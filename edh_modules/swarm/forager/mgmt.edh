@@ -275,14 +275,14 @@ export class Forager {
       workers = {}
 
       perceive this.workerStarted {
-        nil -> { break } # assuming it'll go eos upon forager shutdown
+        nil -> break # assuming it'll go eos upon forager shutdown
         # make sure it's remembered
         # note this perceiver preempts the loop below, so no race
         { ( wkrPid, wsc ) } -> workers[ wkrPid ] = wsc
       }
 
       # for each worker process started, wait one exited
-      for (***) from this.workerStarted
+      for _ from this.workerStarted
       do case waitAnyWorkerDone() of {( donePid:doneAct:doneDesc )} -> {
         console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
         ++ ' - ' ++ doneDesc
@@ -320,7 +320,7 @@ export class Forager {
       # or waited long enough while partial filling is possible
       # TODO make the hardcoded 5 seconds tunable
       || ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
-      -> { break }
+      -> break
 
       console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
       ++ this.hdIdle ++ ' heads to offer.'

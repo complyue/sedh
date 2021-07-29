@@ -165,7 +165,7 @@ export class HeadHunter {
         wait1st=false, # announce the first CFW immediately
       ) do {
         # check if all have finished
-        this.allFinished() -> { break }
+        this.allFinished() -> break
 
         # calibrate this.hcEmployed, wrt forager disconnection etc.
         hcEmployed = 0
@@ -252,7 +252,7 @@ export class HeadHunter {
   method submitJobs() {
     while true {
       ips = this.pendingJobs.pop()
-      ips is None -> { return nil } # no more pending jobs
+      ips is None -> return nil # no more pending jobs
       ai this.pendingCntr <- this.pendingCntr.mrv + 1
 
       while true {
@@ -269,7 +269,7 @@ export class HeadHunter {
         console.debug<| 'Wait for idle workers.'
         # wait until new idle workers appear
         for _ from this.workerAvailable do {
-          not null( this.idleWorkers ) -> { break }
+          not null( this.idleWorkers ) -> break
         }
         console.debug<| 'Got idle workers.'
       }

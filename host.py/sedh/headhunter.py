@@ -279,12 +279,16 @@ WorkToDo(
         err_task = asyncio.create_task(peer.armed_channel(ERR_CHAN).one_more())
 
         async def wait_result():
+            got_result = False
             async for result in job_sink.run_producer(peer.p2c(DATA_CHAN, repr(ips))):
                 self.result_sink.publish((ips, result))
+                got_result = True
                 if worker.check_jobs_quota():
                     self.idle_workers.append(worker)
-                self.worker_available.set()
+                    self.worker_available.set()
                 break  # one ips at a time
+            if not got_result:
+                raise EOFError("Premature end-of-stream")
 
         wait_task = asyncio.create_task(wait_result())
         # submit ips and process result

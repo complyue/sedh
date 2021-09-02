@@ -9,7 +9,7 @@ import Control.Monad
 import qualified Data.HashSet as Set
 import Data.Text (Text)
 import qualified Data.Text as T
-import Language.Edh.EHI
+import Language.Edh.CHI
 import Language.Edh.Net
 import Network.Socket
 import Network.Socket.ByteString

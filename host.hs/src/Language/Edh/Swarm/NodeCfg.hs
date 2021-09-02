@@ -12,7 +12,7 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Language.Edh.EHI
+import Language.Edh.CHI
 import System.Directory
 import System.FilePath
 import System.IO

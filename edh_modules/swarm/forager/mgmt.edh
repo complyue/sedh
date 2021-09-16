@@ -55,7 +55,13 @@ export class WSC {
   method engage ( hcAvailable ) {
     this.hcReserved = min( hcAvailable, this.hcPlanned )
 
-    {
+    { exc } -> { # this can catch exceptions occurred synchronously, or more probably in case here, asynchronously on the forked negotiating thread
+
+      console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
+
+      this.stop() # cleanup on any exception occurred
+
+    } <=$ {
 
       go { # do the negotiation on a separate thread, don't block the forager from comm with other worksources concurrently
 
@@ -124,10 +130,6 @@ export class WSC {
       # register this wsc to the forager
       this.forager.wsd[ this.key() ] = that
 
-    } $=> { exc } -> { # this can catch exceptions occurred synchronously, or more probably in case here, asynchronously on the forked negotiating thread
-      console.error<| 'Stopping team ' ++this++ ' on error: ' ++ desc( exc )
-
-      this.stop() # cleanup on any exception occurred
     }
 
     return this.hcReserved
@@ -312,22 +314,24 @@ export class Forager {
 
     # engage with next worksource in the queue of discovery
     for wsc from this.wsq.streamOut() do {
+      wsc =: WSC()
       console.debug<| 'Discovered new worksource: ' ++ wsc.addr
 
       # do wait if can not immediately fulfill all the heads
       if this.hdIdle < this.headcount and this.hdIdle < wsc.hcPlanned
-      then for _ from this.hcBackIdle
-      # can fulfill now
-      do
-      if ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
-      # or waited long enough while partial filling is possible
-      # TODO make the hardcoded 5 seconds tunable
-      || ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
-      then break
+      then do break {# only #} if (
+        ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
+        or # waited long enough while partial filling is possible
+        # TODO make the hardcoded 5 seconds tunable
+        ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
+      ) for _ from this.hcBackIdle # recheck upon some hc come back idle
 
-      if (wsc.priority < this.last_priority)
-      then {
-        for _ from console.everySeconds(60) do { break }
+      if wsc.priority < this.last_priority then {
+        # wait a minute if the next up queued task is of lower priority than
+        # we've just done, give chance for higher priority tasks in a batch
+        # fashion (i.e. multiple iterations with slight gap time) to hold the
+        # heads before lower priority tasks get to run
+        for _ from console.everySeconds(60) do break
         this.last_priority = wsc.priority
         continue
       }
@@ -336,11 +340,10 @@ export class Forager {
       ++ this.hdIdle ++ ' heads to offer.'
 
       # engage with this worksource with as many free heads atm
-      # `engage()` should return quickly without waiting for network,
-      # network operations are actually forbidden by the intrinsic tx of
-      # assignment
       this.last_priority = wsc.priority
-      this.hdIdle -= wsc.engage( this.hdIdle )
+      # `engage()` should return quickly without waiting for network, make it
+      # atomically-isolatedly in updating `this.hdIdle`
+      ai this.hdIdle -= wsc.engage( this.hdIdle )
     }
 
     # todo this seems unreachable, add shutdown trigger?

@@ -248,7 +248,7 @@ class HeadHunter:
             if hc_employed != self.hc_employed:
                 logger.debug(f"HH has {hc_employed} heads employed now.")
                 self.hc_employed = hc_employed
-            logger.dbeug(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
+            logger.debug(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually

@@ -74,11 +74,17 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
                 logger.debug(
                     f"Swarm worker returning computed result: {result} for ips: {ips}"
                 )
-                await peer.p2c(DATA_CHAN, repr(result))
+                await peer.post_command(
+                    expr("""SettleResult( {$ ips $}, {$ result['res'] $}, {$ None $} )""")
+                )
+                await peer.p2c(DATA_CHAN, None)
             except Exception as job_exc:
                 logger.error(
                     f"Swarm worker failed computing result for ips: {ips}",
                     exc_info=True,
+                )
+                await peer.post_command(
+                    expr("""SettleResult( {$ ips $}, {$ None $}, {$ job_exc $} )""")
                 )
                 await peer.p2c(ERR_CHAN, repr(repr(job_exc)))
                 break  # stop processing more jobs

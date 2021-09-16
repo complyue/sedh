@@ -216,6 +216,8 @@ export class Forager {
     # worksources currently being actively worked on
     this.wsd = {}
 
+    this.last_priority = -1
+
     # available headcounts to be offered
     this.hcBackIdle = sink
     # stream of `pid:wsc` for ever started worker processes
@@ -316,11 +318,19 @@ export class Forager {
       if this.hdIdle < this.headcount and this.hdIdle < wsc.hcPlanned
       then for _ from this.hcBackIdle
       # can fulfill now
-      do ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
+      do
+      if ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
       # or waited long enough while partial filling is possible
       # TODO make the hardcoded 5 seconds tunable
       || ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
-      -> break
+      then break
+
+      if (wsc.priority < this.last_priority)
+      then {
+        for _ from console.everySeconds(60) do { break }
+        this.last_priority = wsc.priority
+        continue
+      }
 
       console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
       ++ this.hdIdle ++ ' heads to offer.'
@@ -329,6 +339,7 @@ export class Forager {
       # `engage()` should return quickly without waiting for network,
       # network operations are actually forbidden by the intrinsic tx of
       # assignment
+      this.last_priority = wsc.priority
       this.hdIdle -= wsc.engage( this.hdIdle )
     }
 

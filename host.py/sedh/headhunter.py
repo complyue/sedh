@@ -87,11 +87,13 @@ class HeadHunter:
         self,
         result_sink: EventSink = None,
         server_modu: str = "sedh.hh",
+        settle_result: Callable = None,
     ):
         loop = asyncio.get_running_loop()
 
         self.result_sink = result_sink or EventSink()
         self.server_modu = server_modu
+        self.settle_result = settle_result
 
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
@@ -178,7 +180,6 @@ class HeadHunter:
             forager = Forager(peer, forager_pid)
             self.foragers[peer] = forager
         forager.hc_employed += hc2employ
-        self.hc_employed += hc2employ
         logger.debug(f"HH is hiring {forager.hc_employed} heads from {peer.ident} now.")
         await peer.p2c(DATA_CHAN, repr(forager.hc_employed))
 
@@ -200,6 +201,7 @@ class HeadHunter:
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
             modu["StartWorking"] = self.StartWorking
+            modu["SettleResult"] = self.settle_result
 
         server = await EdhServer(
             self.server_modu,
@@ -246,7 +248,7 @@ class HeadHunter:
             if hc_employed != self.hc_employed:
                 logger.debug(f"HH has {hc_employed} heads employed now.")
                 self.hc_employed = hc_employed
-            logger.info(f"headcount-------------{self.headcount}  {hc_employed}")
+            logger.dbeug(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually
@@ -281,7 +283,6 @@ WorkToDo(
         async def wait_result():
             got_result = False
             async for result in job_sink.run_producer(peer.p2c(DATA_CHAN, repr(ips))):
-                self.result_sink.publish((ips, result))
                 got_result = True
                 if worker.check_jobs_quota():
                     self.idle_workers.append(worker)
@@ -332,6 +333,7 @@ WorkToDo(
                     new_ips = await maybe_coro
                 else:
                     new_ips = maybe_coro
+                logger.info(f"retry job for ips={ips}")
                 self.pending_jobs.append(new_ips)
         except Exception:
             logger.error(f"Failed to retry job for ips={ips!r}", exc_info=True)

@@ -3,7 +3,7 @@
 import * 'swarm/forager'
 
 forageOn(
-  heartcount= 1, # number of worker processes to vend
+  headcount= 1, # number of worker processes to vend
   targetPrefix = '', # prefix to filter out uninteresting work
   swarmAddr = '0.0.0.0', # local addr to sniff for call-for-workers
   swarmPort = 3722, # local port to sniff for call-for-workers

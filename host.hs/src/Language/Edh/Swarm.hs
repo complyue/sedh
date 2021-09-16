@@ -6,7 +6,7 @@ import Control.Concurrent.STM
 import Control.Monad.Reader
 import Data.Text (Text)
 import qualified Data.Text as T
-import Language.Edh.EHI
+import Language.Edh.CHI
 import Language.Edh.Net
 import Language.Edh.Repl
 import Language.Edh.Run

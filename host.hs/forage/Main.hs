@@ -2,7 +2,7 @@ module Main where
 
 -- import           Debug.Trace
 
-import Language.Edh.EHI
+import Language.Edh.CHI
 import Language.Edh.Net
 import Language.Edh.Run
 import Language.Edh.Swarm

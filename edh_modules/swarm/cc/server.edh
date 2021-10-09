@@ -21,48 +21,7 @@ export class SwarmController {
 
   {## computing node configuration template
    # serving as default when a new unknown computing node attempts booting #}
-  CNODE_CFG_TMPL = expr {
-    # ctrl fields as well as metadata
-    swarm = 'cn'
-    user = 'dw'
-    admin = 'dwa'
-
-    # this is always implanted automatically
-    # note: use (=:) to just prototype it, but never overwrite it!
-    mac =: '00:00:00:00:00:00'
-
-    # these should be continuously updated by heartbeats from the booted node
-    # note: use (?=) to supply initial values, but never overwrite existing ones!
-    timestamp ?= None
-    ip ?= None
-    vmem ?= {"total": 0, "available": 0, "active": 0, "inactive": 0, }
-    swap ?= {"total": 0, "used": 0, "free": 0,}
-    cpuload ?= [] # utilized percents of each virtual one
-    nps ?= 0 # number of processes
-
-    # provide clickable link to show on the browser for login to this node
-    method login_link() {
-      null(ip) -> 'javascript:alert("Compute node ['++ mac ++'] not booted!")'
-      'ssh://' ++ user ++ '@' ++ ip
-    }
-
-    method admin_account() {
-      admin ++ '@' ++ ip
-    }
-
-    # make it bootable or not, mounting root fs from certain nfs server
-    bootable = true
-    nfs_server = '10.88.88.139'
-    if bootable then perform boot(
-      kernel= "file:///"++ swarm ++"root/boot/kernel",
-      initrd= [ "file:///"++ swarm ++"root/boot/initrd", ],
-      cmdline= ' '.join(
-        "root=/dev/nfs",
-        "nfsroot="++ nfs_server ++":/"++ swarm ++"root,ro,noacl",
-        "ip=dhcp",
-      )
-    )
-  }
+  method cnodeCfgTmpl() { iexpr 'swarm/cc/cnode-cfg' }.deBlock
 
 
   # constructor
@@ -73,7 +32,7 @@ export class SwarmController {
   ) {
 
     {## Registry of all nodes #}
-    this.nreg = NodeReg( that.CNODE_CFG_TMPL.deBlock, regDir= regDir, )
+    this.nreg = NodeReg( that.cnodeCfgTmpl(), regDir= regDir, )
 
     {## Serving PixieApi, management page, and various browser-facing API endpoints over http #}
     this.http = HttpServer(

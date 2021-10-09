@@ -43,6 +43,7 @@ export class SwarmController {
         'pixie/v1/boot/:mac': that.pixieApi,
         'cnode/v1/save/:mac': that.cfgSaveApi,
         'cnode/v1/load/:mac': that.cfgLoadApi,
+        'cnode/v1/eval/:mac': that.cfgEvalApi,
         'cnodes.csv': that.csvDownload,
       } =< that.URL_ROUTES,
       front= that.managementPage,
@@ -84,6 +85,23 @@ export class SwarmController {
   method csvDownload() {
     effect knownNodes = this.nreg.knownNodes
     include './web/csv'
+  }
+
+  method cfgEvalApi() {
+    perform setContentType$ "text/plain"
+    rspValue = ''
+    {
+      let
+      , ( mac, ** ) = perform rqParams
+      , src = perform readSource()
+      , ( attrs, ** ) = this.nreg.cfgOf(mac)
+      , rspValue = attrs.eval$ parseEdh$ src
+    } $=> { exc } -> {
+      perform setResponseCode(500)
+      rspValue = exc
+    } @=> {
+      perform writeText$ str$ rspValue
+    }
   }
 
   method cfgLoadApi() {

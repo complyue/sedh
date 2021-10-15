@@ -196,6 +196,7 @@ prepareNodeCfg ets !nreg !mac = do
                         AttrAddrSrc (NamedAttr srcName) noSrcRange,
                       edh'procedure'args =
                         NullaryReceiver,
+                      edh'procedure'anno = Nothing,
                       edh'procedure'body =
                         StmtSrc VoidStmt noSrcRange,
                       edh'procedure'loc =

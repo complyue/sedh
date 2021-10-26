@@ -5,7 +5,7 @@ module Language.Edh.Swarm where
 import Control.Monad.Reader
 import Data.Text (Text)
 import qualified Data.Text as T
-import Language.Edh.MHI
+import Language.Edh.EHI
 import Language.Edh.Net
 import Language.Edh.Repl
 import Language.Edh.Run

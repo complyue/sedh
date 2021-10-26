@@ -6,126 +6,115 @@ import Control.Concurrent (forkFinally, forkIO, threadDelay)
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+import Control.Monad.IO.Class
 import qualified Data.HashSet as Set
 import Data.Text (Text)
 import qualified Data.Text as T
-import Language.Edh.CHI
+import Language.Edh.MHI
 import Language.Edh.Net
 import Network.Socket
 import Network.Socket.ByteString
 import System.Posix
 import Prelude
 
-waitAnyWorkerDoneProc :: EdhHostProc
-waitAnyWorkerDoneProc !exit !ets =
-  runEdhTx ets $
-    edhContIO $
-      waitAnyWorker
-        >>= atomically . exitEdh ets exit
-  where
-    waitAnyWorker :: IO EdhValue
-    waitAnyWorker =
-      getAnyProcessStatus True False >>= \case
-        Nothing -> return nil
-        Just (pid, status) -> case status of
-          Exited !exitCode ->
-            return $
-              EdhPair
-                (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "exited"))
-                $ EdhString $
-                  T.pack $
-                    show exitCode
-          Terminated !sig !coreDumped ->
-            return $
-              EdhPair
-                (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "killed"))
-                $ EdhString $
-                  T.pack $
-                    "by "
-                      <> show sig
-                      <> if coreDumped
-                        then " with"
-                        else " without" <> " core dumped"
-          Stopped !sig ->
-            return $
-              EdhPair
-                (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "stopped"))
-                $ EdhString $
-                  T.pack $
-                    "by "
-                      <> show sig
+waitAnyWorkerDoneProc :: Edh EdhValue
+waitAnyWorkerDoneProc =
+  liftIO $
+    getAnyProcessStatus True False >>= \case
+      Nothing -> return nil
+      Just (pid, status) -> case status of
+        Exited !exitCode ->
+          return $
+            EdhPair
+              (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "exited"))
+              $ EdhString $
+                T.pack $
+                  show exitCode
+        Terminated !sig !coreDumped ->
+          return $
+            EdhPair
+              (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "killed"))
+              $ EdhString $
+                T.pack $
+                  "by "
+                    <> show sig
+                    <> if coreDumped
+                      then " with"
+                      else " without" <> " core dumped"
+        Stopped !sig ->
+          return $
+            EdhPair
+              (EdhPair (EdhDecimal $ fromIntegral pid) (EdhString "stopped"))
+              $ EdhString $
+                T.pack $
+                  "by "
+                    <> show sig
 
 wscStartWorkerProc ::
   "wsAddr" !: Object ->
   "workDir" !: Text ->
   "jobExecutable" !: EdhValue ->
   "workModu" !: Text ->
-  EdhHostProc
+  Edh EdhValue
 wscStartWorkerProc
   (mandatoryArg -> !wsAddrObj)
   (mandatoryArg -> !workDir)
   (mandatoryArg -> !jobExecutable)
-  (mandatoryArg -> workModu)
-  !exit
-  !ets = prepCmdl $ \ !wkrCmdl ->
-    serviceAddressFrom ets wsAddrObj $ \(!servAddr, !servPort) ->
-      runEdhTx ets $
-        edhContIO $ do
-          let !hints =
-                defaultHints
-                  { addrFlags = [AI_PASSIVE],
-                    addrSocketType = Stream
-                  }
-          addr : _ <-
-            getAddrInfo
-              (Just hints)
-              (Just $ T.unpack servAddr)
-              (Just (show servPort))
-          bracket
-            ( socket
-                (addrFamily addr)
-                (addrSocketType addr)
-                (addrProtocol addr)
-            )
-            close
-            $ \ !sock -> do
-              connect sock (addrAddress addr)
-              bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
-                -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                setFdOption (Fd wscFd) CloseOnExec False
-                !wkrPid <- forkProcess $ do
-                  changeWorkingDirectory $ T.unpack workDir
-                  executeFile
-                    "/usr/bin/env"
-                    False
-                    (wkrCmdl ++ [T.unpack workModu, show wscFd])
-                    Nothing
-                atomically $
-                  exitEdh ets exit $
-                    EdhDecimal $ fromIntegral wkrPid
+  (mandatoryArg -> workModu) = do
+    !wkrCmdl <- prepCmdl
+    (!servAddr, !servPort) <- serviceAddressFrom wsAddrObj
+    liftIO $ do
+      let !hints =
+            defaultHints
+              { addrFlags = [AI_PASSIVE],
+                addrSocketType = Stream
+              }
+      addr : _ <-
+        getAddrInfo
+          (Just hints)
+          (Just $ T.unpack servAddr)
+          (Just (show servPort))
+      bracket
+        ( socket
+            (addrFamily addr)
+            (addrSocketType addr)
+            (addrProtocol addr)
+        )
+        close
+        $ \ !sock -> do
+          connect sock (addrAddress addr)
+          bracket (socketToFd sock) (closeFd . Fd) $ \wscFd -> do
+            -- clear FD_CLOEXEC flag so it can be passed to subprocess
+            setFdOption (Fd wscFd) CloseOnExec False
+            !wkrPid <- forkProcess $ do
+              changeWorkingDirectory $ T.unpack workDir
+              executeFile
+                "/usr/bin/env"
+                False
+                (wkrCmdl ++ [T.unpack workModu, show wscFd])
+                Nothing
+            return $ EdhDecimal $ fromIntegral wkrPid
     where
-      strSeq :: [EdhValue] -> [String] -> ([String] -> STM ()) -> STM ()
-      strSeq [] !sl exit' = exit' $ reverse sl
-      strSeq (v : vs) !sl exit' = case edhUltimate v of
-        EdhString !s -> strSeq vs (T.unpack s : sl) exit'
+      strSeq :: [EdhValue] -> [String] -> Edh [String]
+      strSeq [] !sl = return $ reverse sl
+      strSeq (v : vs) !sl = case edhUltimate v of
+        EdhString !s -> strSeq vs (T.unpack s : sl)
         _ ->
-          throwEdh ets UsageError $
+          throwEdhM UsageError $
             "In exec cmdl, not a string: "
               <> T.pack
                 (show v)
-      prepCmdl :: ([String] -> STM ()) -> STM ()
-      prepCmdl !exit' = case jobExecutable of
-        EdhString !executable -> exit' [T.unpack executable]
-        EdhArgsPack (ArgsPack !vs _) -> strSeq vs [] exit'
-        EdhList (List _ !lv) -> readTVar lv >>= \vs -> strSeq vs [] exit'
-        _ -> throwEdh ets UsageError "invalid jobExecutable"
+      prepCmdl :: Edh [String]
+      prepCmdl = case jobExecutable of
+        EdhString !executable -> return [T.unpack executable]
+        EdhArgsPack (ArgsPack !vs _) -> strSeq vs []
+        EdhList (List _ !lv) -> readTVarEdh lv >>= \vs -> strSeq vs []
+        _ -> throwEdhM UsageError "invalid jobExecutable"
 
-killWorkerProc :: "workerPid" !: Int -> EdhHostProc
-killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
-  runEdhTx ets $
-    edhContIO $ do
-      confirmKill $ fromIntegral wkrPid
-      atomically $ exitEdh ets exit nil
+killWorkerProc :: "workerPid" !: Int -> Edh EdhValue
+killWorkerProc (mandatoryArg -> !wkrPid) = liftIO $ do
+  confirmKill $ fromIntegral wkrPid
+  return nil
   where
     confirmKill :: ProcessID -> IO ()
     -- assuming failure means the process by this pid doesn't exist (anymore)
@@ -137,39 +126,38 @@ killWorkerProc (mandatoryArg -> !wkrPid) !exit !ets =
       threadDelay 3000000 -- wait 3 seconds before try another round
       confirmKill pid
 
-wscTakeProc :: Object -> "wscFd" !: Int -> EdhHostProc
-wscTakeProc !peerClass (mandatoryArg -> !wscFd) !exit !ets =
-  mkObjSandbox ets caller'this $ \ !sandboxScope -> do
-    let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
-    !pktSink <- newEmptyTMVar
-    !poq <- newEmptyTMVar
-    !disposalsVar <- newTVar mempty
-    !chdVar <- newTVar mempty
-    !wkrEoL <- newEmptyTMVar
-    let !peer =
-          Peer
-            { edh'peer'ident = peerId,
-              edh'peer'sandbox = Just sandboxScope,
-              edh'peer'eol = wkrEoL,
-              edh'peer'posting = putTMVar poq,
-              edh'peer'hosting = takeTMVar pktSink,
-              edh'peer'disposals = disposalsVar,
-              edh'peer'channels = chdVar
-            }
-    !peerObj <- edhCreateHostObj peerClass peer
+wscTakeProc :: Object -> "wscFd" !: Int -> Edh EdhValue
+wscTakeProc !peerClass (mandatoryArg -> !wscFd) = do
+  !ets <- edhThreadState
+  let !ctx = edh'context ets
+      !caller'this = edh'scope'this $ callingScope ctx
+  !sandbox <- mkObjSandboxM caller'this
 
-    runEdhTx ets $
-      edhContIO $ do
-        void $
-          forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
-            \ !result -> atomically $ do
-              !sinks2Dispose <- readTVar disposalsVar
-              sequence_ $ flip postEvent EdhNil <$> Set.toList sinks2Dispose
-              void $ tryPutTMVar wkrEoL result
-        atomically $ exitEdh ets exit $ EdhObject peerObj
-  where
-    !ctx = edh'context ets
-    !caller'this = edh'scope'this $ callingScope ctx
+  let !peerId = "<wsc#" <> T.pack (show wscFd) <> ">"
+  !pktSink <- newEmptyTMVarEdh
+  !poq <- newEmptyTMVarEdh
+  !disposalsVar <- newTVarEdh mempty
+  !chdVar <- newTVarEdh mempty
+  !wkrEoL <- newEmptyTMVarEdh
+  let !peer =
+        Peer
+          { edh'peer'ident = peerId,
+            edh'peer'sandbox = Just sandbox,
+            edh'peer'eol = wkrEoL,
+            edh'peer'posting = putTMVar poq,
+            edh'peer'hosting = takeTMVar pktSink,
+            edh'peer'disposals = disposalsVar,
+            edh'peer'channels = chdVar
+          }
+  !peerObj <- createHostObjectM peerClass peer
+  afterTxIO $ do
+    void $
+      forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
+        \ !result -> atomically $ do
+          !sinks2Dispose <- readTVar disposalsVar
+          sequence_ $ flip postEvent EdhNil <$> Set.toList sinks2Dispose
+          void $ tryPutTMVar wkrEoL result
+  return $ EdhObject peerObj
 
 workerThread ::
   Int ->

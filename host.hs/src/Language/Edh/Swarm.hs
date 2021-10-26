@@ -27,7 +27,7 @@ systemProc (mandatoryArg -> !cmd) =
 installSwarmCtrlBatteries :: EdhWorld -> IO ()
 installSwarmCtrlBatteries !world = do
   void $
-    installEdhModuleM world "swarm/CTRL" $ do
+    installModuleM world "swarm/CTRL" $ do
       !moduScope <- contextScope . edh'context <$> edhThreadState
 
       !nregClass <- createNodeRegClass
@@ -58,7 +58,7 @@ installSwarmBatteries
   !world =
     do
       void $
-        installEdhModuleM world "swarm/ENV" $ do
+        installModuleM world "swarm/ENV" $ do
           !moduScope <- contextScope . edh'context <$> edhThreadState
 
           iopdUpdateEdh
@@ -76,7 +76,7 @@ installSwarmBatteries
             (edh'scope'entity moduScope)
 
       void $
-        installEdhModuleM world "swarm/RT" $ do
+        installModuleM world "swarm/RT" $ do
           !moduScope <- contextScope . edh'context <$> edhThreadState
 
           -- loosely depend on the @net@ runtime from nedh project

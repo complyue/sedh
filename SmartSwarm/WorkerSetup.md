@@ -165,8 +165,8 @@ Recreate a `/etc/resolv.conf`, with the dns server of your preference
 ```bash
 rm /etc/resolv.conf
 cat << EOF > /etc/resolv.conf
-nameserver 223.5.5.5
-nameserver 119.29.29.29
+nameserver 8.8.8.8
+nameserver 8.8.4.4
 EOF
 ```
 

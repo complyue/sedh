@@ -132,8 +132,8 @@ e1a0b1ec-c690-11ea-8e16-d3e64a9e7fe3  minimal-64                      20.2.0    
   "max_physical_memory": 8000,
   "quota": 20,
   "resolvers": [
-    "223.5.5.5",
-    "119.29.29.29"
+    "8.8.8.8",
+    "8.8.4.4"
   ],
   "nics": [
     {

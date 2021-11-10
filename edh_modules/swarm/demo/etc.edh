@@ -1,4 +1,6 @@
 
+import * 'math'
+
 {
 
   export generator m_range() {

@@ -25,25 +25,24 @@ systemProc (mandatoryArg -> !cmd) =
         return $ EdhDecimal $ fromIntegral errCode
 
 installSwarmCtrlBatteries :: EdhWorld -> IO ()
-installSwarmCtrlBatteries !world = do
-  void $
-    installModuleM world "swarm/CTRL" $ do
-      !moduScope <- contextScope . edh'context <$> edhThreadState
+installSwarmCtrlBatteries !world = runProgramM_ world $ do
+  installModuleM_ "swarm/CTRL" $ do
+    !moduScope <- contextScope . edh'context <$> edhThreadState
 
-      !nregClass <- createNodeRegClass
+    !nregClass <- createNodeRegClass
 
-      !moduMths <-
-        sequence $
-          [ (AttrByName nm,) <$> mkEdhProc mc nm hp
-            | (nm, mc, hp) <-
-                [("system", EdhMethod, wrapEdhProc systemProc)]
-          ]
+    !moduMths <-
+      sequence $
+        [ (AttrByName nm,) <$> mkEdhProc mc nm hp
+          | (nm, mc, hp) <-
+              [("system", EdhMethod, wrapEdhProc systemProc)]
+        ]
 
-      let !moduArts = (AttrByName "NodeReg", EdhObject nregClass) : moduMths
+    let !moduArts = (AttrByName "NodeReg", EdhObject nregClass) : moduMths
 
-      iopdUpdateEdh moduArts $ edh'scope'entity moduScope
-      !esExps <- prepareExpStoreM (edh'scope'this moduScope)
-      iopdUpdateEdh moduArts esExps
+    iopdUpdateEdh moduArts $ edh'scope'entity moduScope
+    !esExps <- prepareExpStoreM (edh'scope'this moduScope)
+    iopdUpdateEdh moduArts esExps
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
 installSwarmBatteries
@@ -55,58 +54,55 @@ installSwarmBatteries
       !workerPid
       !wscFd
     )
-  !world =
-    do
-      void $
-        installModuleM world "swarm/ENV" $ do
-          !moduScope <- contextScope . edh'context <$> edhThreadState
+  !world = runProgramM_ world $ do
+    installModuleM_ "swarm/ENV" $ do
+      !moduScope <- contextScope . edh'context <$> edhThreadState
 
-          iopdUpdateEdh
-            [ (AttrByName "jobExecutable", EdhString executable),
-              (AttrByName "jobWorkDir", EdhString workDir),
-              (AttrByName "jobWorkSpec", EdhString workSpec),
-              ( AttrByName "swarmManagerPid",
-                EdhDecimal $ fromIntegral managerPid
-              ),
-              ( AttrByName "swarmWorkerPid",
-                EdhDecimal $ fromIntegral workerPid
-              ),
-              (AttrByName "wscFd", EdhDecimal $ fromIntegral wscFd)
-            ]
-            (edh'scope'entity moduScope)
+      iopdUpdateEdh
+        [ (AttrByName "jobExecutable", EdhString executable),
+          (AttrByName "jobWorkDir", EdhString workDir),
+          (AttrByName "jobWorkSpec", EdhString workSpec),
+          ( AttrByName "swarmManagerPid",
+            EdhDecimal $ fromIntegral managerPid
+          ),
+          ( AttrByName "swarmWorkerPid",
+            EdhDecimal $ fromIntegral workerPid
+          ),
+          (AttrByName "wscFd", EdhDecimal $ fromIntegral wscFd)
+        ]
+        (edh'scope'entity moduScope)
 
-      void $
-        installModuleM world "swarm/RT" $ do
-          !moduScope <- contextScope . edh'context <$> edhThreadState
+    installModuleM_ "swarm/RT" $ do
+      !moduScope <- contextScope . edh'context <$> edhThreadState
 
-          -- loosely depend on the @net@ runtime from nedh project
-          !peerClass <- getPeerClass
-          !moduArts <-
-            sequence $
-              [ (AttrByName nm,) <$> mkEdhProc mc nm hp
-                | (nm, mc, hp) <-
-                    [ ( "killWorker",
-                        EdhMethod,
-                        wrapEdhProc killWorkerProc
-                      ),
-                      ( "wscTake",
-                        EdhMethod,
-                        wrapEdhProc $ wscTakeProc peerClass
-                      ),
-                      ( "waitAnyWorkerDone",
-                        EdhMethod,
-                        wrapEdhProc waitAnyWorkerDoneProc
-                      ),
-                      ( "wscStartWorker",
-                        EdhMethod,
-                        wrapEdhProc wscStartWorkerProc
-                      )
-                    ]
-              ]
+      -- loosely depend on the @net@ runtime from nedh project
+      !peerClass <- getPeerClass
+      !moduArts <-
+        sequence $
+          [ (AttrByName nm,) <$> mkEdhProc mc nm hp
+            | (nm, mc, hp) <-
+                [ ( "killWorker",
+                    EdhMethod,
+                    wrapEdhProc killWorkerProc
+                  ),
+                  ( "wscTake",
+                    EdhMethod,
+                    wrapEdhProc $ wscTakeProc peerClass
+                  ),
+                  ( "waitAnyWorkerDone",
+                    EdhMethod,
+                    wrapEdhProc waitAnyWorkerDoneProc
+                  ),
+                  ( "wscStartWorker",
+                    EdhMethod,
+                    wrapEdhProc wscStartWorkerProc
+                  )
+                ]
+          ]
 
-          iopdUpdateEdh moduArts $ edh'scope'entity moduScope
-          !esExps <- prepareExpStoreM (edh'scope'this moduScope)
-          iopdUpdateEdh moduArts esExps
+      iopdUpdateEdh moduArts $ edh'scope'entity moduScope
+      !esExps <- prepareExpStoreM (edh'scope'this moduScope)
+      iopdUpdateEdh moduArts esExps
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization = do

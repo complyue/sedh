@@ -237,7 +237,7 @@ loadNodeCfg !world !srcName !src !attrs = do
   !result <- newTVarIO Nothing
   void $
     runProgramM' world $
-      pushStackM $ do
+      runNested $ do
         let bootProc :: ArgsPack -> Edh EdhValue
             bootProc !apk =
               edhValueJsonM (EdhArgsPack apk) >>= \ !jsonStr -> do
@@ -254,7 +254,7 @@ loadNodeCfg !world !srcName !src !attrs = do
             ]
         let !effArts = effMths
         prepareEffStoreM >>= iopdUpdateEdh effArts
-        pushStackM' attrs $ evalSrcM srcName src
+        runNestedIn attrs $ evalSrcM srcName src
   readTVarIO result
 
 cfgFilePathOf :: FilePath -> Text -> FilePath

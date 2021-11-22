@@ -8,7 +8,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.ByteString
 import qualified Data.ByteString as B
-import Data.Dynamic
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,6 +24,12 @@ data NodeReg = NodeReg
     node'cfg'default :: !(Text, TVar (EpochTime, Text)),
     node'cfg'reg :: !(IOPD NodeKey NodeCfg)
   }
+
+instance Eq NodeReg where
+  x == y = node'cfg'reg x == node'cfg'reg y
+
+instance Hashable NodeReg where
+  hashWithSalt s r = s `hashWithSalt` node'cfg'reg r
 
 type NodeKey = Text -- MAC address with colon (:) as separator
 
@@ -73,7 +78,7 @@ createNodeRegClass =
     nregAllocator ::
       "cfgDefault" !: EdhValue ->
       "regDir" ?: Text ->
-      Edh (Maybe Unique, ObjectStore)
+      Edh ObjectStore
     nregAllocator
       (mandatoryArg -> !cfgDefault)
       (defaultArg "./etc" -> !regDir) =
@@ -88,22 +93,16 @@ createNodeRegClass =
               !reg <- iopdEmptyEdh
               let !nreg = NodeReg regDirPath (cfgDefaultText, defVar) reg
               void $ liftIO $ prepareDefaultCfg nreg
-              return (Nothing, HostStore $ toDyn nreg)
-
-    withThisReg :: forall r. (Object -> NodeReg -> Edh r) -> Edh r
-    withThisReg withCfg = do
-      !this <- edh'scope'this . contextScope . edh'context <$> edhThreadState
-      case fromDynamic =<< dynamicHostData this of
-        Nothing -> throwEdhM EvalError "bug: this is not an NodeReg"
-        Just !col -> withCfg this col
+              return $ storeHostValue nreg
 
     nregReprProc :: Edh EdhValue
-    nregReprProc = withThisReg $ \_this !nreg ->
-      return $ EdhString $ "NodeReg<" <> T.pack (node'reg'dir nreg) <> ">"
+    nregReprProc =
+      thisHostObjectOf >>= \ !nreg ->
+        return $ EdhString $ "NodeReg<" <> T.pack (node'reg'dir nreg) <> ">"
 
     saveCfgSrcProc :: "mac" !: Text -> "src" !: Text -> Edh EdhValue
     saveCfgSrcProc (mandatoryArg -> !mac) (mandatoryArg -> !src) =
-      withThisReg $ \_this !nreg -> do
+      thisHostObjectOf >>= \ !nreg -> do
         !world <- edh'prog'world <$> edhProgramState
         (pfp, attrs, _) <- prepareNodeCfg nreg mac
         !ncfg <- liftIO $ do
@@ -123,54 +122,56 @@ createNodeRegClass =
         wrapNodeCfg ncfg
 
     nregCfgOfProc :: "mac" !: Text -> Edh EdhValue
-    nregCfgOfProc (mandatoryArg -> !mac) = withThisReg $ \_this !nreg -> do
-      !world <- edh'prog'world <$> edhProgramState
-      (pfp, attrs, cfgLoaded) <- prepareNodeCfg nreg mac
-      !ncfg <- liftIO $ do
-        try (modificationTime <$> getFileStatus pfp) >>= \case
-          Left (_errRead :: IOError) -> do
-            -- assuming non-existing, try write fresh. the write should fail
-            -- similarly to stat, due to other IO problems, e.g. permission,
-            -- fs corruption etc. and such errors in writting the file will
-            -- propagate to Edh code this time.
-            atomically $
-              iopdInsert
-                (AttrByName "mac")
-                (EdhString mac)
-                (edh'scope'entity attrs)
-            !src <- prepareDefaultCfg nreg
-            !boot <- saveNodeCfg pfp world (T.pack pfp) src attrs
-            -- get file mod time after written
-            !tsFile <- modificationTime <$> getFileStatus pfp
-            -- record & return to Edh
-            atomically $ do
-              let !ncfg = NodeCfg src tsFile attrs boot
-              iopdInsert mac ncfg $ node'cfg'reg nreg
-              return ncfg
-          Right !tsFile -> case cfgLoaded of
-            Just !ncfg
-              | node'cfg'persist'ts ncfg >= tsFile ->
-                -- in-mem loaded cfg is up-to-date
-                atomically $ return ncfg
-            _ -> do
-              !src <- TE.decodeUtf8 <$> B.readFile pfp
-              -- load disk file for updated cfg
+    nregCfgOfProc (mandatoryArg -> !mac) =
+      thisHostObjectOf >>= \ !nreg -> do
+        !world <- edh'prog'world <$> edhProgramState
+        (pfp, attrs, cfgLoaded) <- prepareNodeCfg nreg mac
+        !ncfg <- liftIO $ do
+          try (modificationTime <$> getFileStatus pfp) >>= \case
+            Left (_errRead :: IOError) -> do
+              -- assuming non-existing, try write fresh. the write should fail
+              -- similarly to stat, due to other IO problems, e.g. permission,
+              -- fs corruption etc. and such errors in writting the file will
+              -- propagate to Edh code this time.
               atomically $
                 iopdInsert
                   (AttrByName "mac")
                   (EdhString mac)
                   (edh'scope'entity attrs)
-              !boot <- loadNodeCfg world (T.pack pfp) src attrs
+              !src <- prepareDefaultCfg nreg
+              !boot <- saveNodeCfg pfp world (T.pack pfp) src attrs
+              -- get file mod time after written
+              !tsFile <- modificationTime <$> getFileStatus pfp
               -- record & return to Edh
               atomically $ do
                 let !ncfg = NodeCfg src tsFile attrs boot
                 iopdInsert mac ncfg $ node'cfg'reg nreg
                 return ncfg
-      wrapNodeCfg ncfg
+            Right !tsFile -> case cfgLoaded of
+              Just !ncfg
+                | node'cfg'persist'ts ncfg >= tsFile ->
+                  -- in-mem loaded cfg is up-to-date
+                  atomically $ return ncfg
+              _ -> do
+                !src <- TE.decodeUtf8 <$> B.readFile pfp
+                -- load disk file for updated cfg
+                atomically $
+                  iopdInsert
+                    (AttrByName "mac")
+                    (EdhString mac)
+                    (edh'scope'entity attrs)
+                !boot <- loadNodeCfg world (T.pack pfp) src attrs
+                -- record & return to Edh
+                atomically $ do
+                  let !ncfg = NodeCfg src tsFile attrs boot
+                  iopdInsert mac ncfg $ node'cfg'reg nreg
+                  return ncfg
+        wrapNodeCfg ncfg
 
     nregKnownNodesProc :: Edh EdhValue
-    nregKnownNodesProc = withThisReg $ \_this !nreg ->
-      iopdToListEdh (node'cfg'reg nreg) >>= yieldNext
+    nregKnownNodesProc =
+      thisHostObjectOf >>= \ !nreg ->
+        iopdToListEdh (node'cfg'reg nreg) >>= yieldNext
       where
         yieldNext :: [(NodeKey, NodeCfg)] -> Edh EdhValue
         yieldNext [] = return nil

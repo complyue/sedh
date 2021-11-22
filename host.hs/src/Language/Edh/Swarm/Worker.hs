@@ -149,7 +149,7 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) = do
             edh'peer'disposals = disposalsVar,
             edh'peer'channels = chdVar
           }
-  !peerObj <- createHostObjectM peerClass peer
+  !peerObj <- createArbiHostObjectM peerClass peer
   afterTxIO $ do
     void $
       forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $

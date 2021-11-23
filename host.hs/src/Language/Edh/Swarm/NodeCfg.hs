@@ -60,7 +60,7 @@ wrapNodeCfg (NodeCfg !src _tsCfg !attrs !boot) =
 
 createNodeRegClass :: Edh Object
 createNodeRegClass =
-  mkEdhClass "NodeReg" (allocObjM nregAllocator) [] $ do
+  mkEdhClass' "NodeReg" nregAllocator [] $ do
     !mths <-
       sequence
         [ (AttrByName nm,) <$> mkEdhProc vc nm hp

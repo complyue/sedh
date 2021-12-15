@@ -16,9 +16,11 @@ senv = import _ 'swarm/ENV'
 
 export class HeadHunter {
 
-  data Forager ( peer, pid ) {
-    hcEmployed = 0
-    hcWorking = 0
+  class Forager {
+    method __init__( peer as this.peer, pid as this.pid ) {
+      this.hcEmployed = 0
+      this.hcWorking = 0
+    }
   }
 
   class Worker {
@@ -130,13 +132,12 @@ export class HeadHunter {
 
         {
 
-          while peer.eol() is false case peer.readCommand() of {
+          while peer.eol() is false case peer.readCommand() of {@
             # sequence of commands each resulting in nil are expected and let pass here
             { cmdVal } -> {
-              console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
-              cmdVal = nil # clear it
+              console.warn<| 'Unexpected cmd from ' ++peer++ '\n  ' ++cmdVal
             }
-          }
+          @}
 
         } @=> { exc } -> {
           console.warn<| 'Exception by swarm forager/worker ' ++ peer
@@ -171,11 +172,10 @@ export class HeadHunter {
 
         # calibrate this.hcEmployed, wrt forager disconnection etc.
         hcEmployed = 0
-        for ( peer, forager ) from this.foragers
         do case peer.eol() of {
           false -> hcEmployed += forager.hcEmployed
           this.foragers[ peer ] = nil # forget about it
-        }
+        } for@ ( peer, forager ) from this.foragers
         if this.hcEmployed != hcEmployed then {
           console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
           this.hcEmployed = hcEmployed
@@ -240,7 +240,7 @@ export class HeadHunter {
       break # terminate this thread
     }
     # submit ips and process result
-    for result from (outlet= jobSink )|() =>* {
+    for result from ( outlet= jobSink )|() =>* {
       worker.peer.p2c( dataChan, repr( ips ) )
     } do {
       this.resultSink <- ( ips, result )
@@ -288,7 +288,7 @@ export class HeadHunter {
 
     perceive this.pendingCntr.subseq 0 -> this.allFinished()
 
-    for (*** _ ) from this.resultSink do { pass }
+    for (***) from this.resultSink do { pass }
   }
 
 }

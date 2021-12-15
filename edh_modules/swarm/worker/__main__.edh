@@ -12,10 +12,41 @@ import * 'swarm/RT'
 # 'swarm/ENV', import the module as a reference, to get/set effective artifacts
 # living there
 senv = { import _ 'swarm/ENV' }
+# let's prototype it as a namespace for sake of IntelliSense
+senv =: namespace senv() {
 
+  # the Edh intepreter executable for hh/worker
+  jobExecutable :: path!String || [ cmdl!String ]
+  jobExecutable =: '/path/to/edh/interpreter'
+
+  # the working directory in which the job is initiated
+  jobWorkDir :: path!String
+  jobWorkDir =: '/path/to/cwd/of/hh'
+
+  # - in HH process:
+  #  the .edh file on command line of gwd, the work scheduler script
+  # - in worker process:
+  #  name of the work definition module
+  jobWorkSpec :: path!String
+  jobWorkSpec =: '/path/to/job/init/script or work/def/modu'
+
+  # os pid of forager process
+  swarmManagerPid :: pid!int!Decimal
+  swarmManagerPid =: 1231
+
+  # os pid of worker process
+  swarmWorkerPid :: pid!int!Decimal
+  swarmWorkerPid =: 1232
+
+  # os file descripter number for the socket connected to hh from worker
+  wscFd :: fd!int!Decimal
+  wscFd =: 15
+
+}
 
 # take the worksource connection file describer, make it a peer for comm
 peer = wscTake( senv.wscFd )
+peer =: Peer()
 console.debug<| 'Took worker connection to worksource: ' ++ peer
 defer {
   console.debug<| 'Disconnecting worker for worksource ' ++ peer
@@ -31,12 +62,13 @@ effect {
 
 # in a worker process, @senv.jobWorkSpec@ is the work definition module
 workDefinition = senv.jobWorkSpec
-# import work related artifacts, especially `@doOneJob` from there
+# import work related artifacts, possibly referenced in landing peer commands
 import * workDefinition
-
+# the conventional `@doOneJob` should have been imported as by above
+; @doOneJob =: (**) => pass
 
 # apks are expected to be posted to a worker's data channel, one by one
-go for ips from (outlet= jobSink )|() =>* {
+go for ips from ( outlet= jobSink )|() =>* {
   # identify this connection as swarm worker to the headhunter, then it will
   # start sending ips to our data channel
   peer.postCommand( expr
@@ -48,7 +80,7 @@ go for ips from (outlet= jobSink )|() =>* {
 } do {
   console.debug<| 'Computing ips: ' ++ ips
 
-  case @doOneJob(** ips ) of {
+  case @doOneJob( **ips ) of {
     { result } -> {
       console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
       #   peer.p2c( dataChan, repr( result ) )

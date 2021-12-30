@@ -153,10 +153,10 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) = do
   afterTxIO $ do
     void $
       forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
-        \ !result -> atomically $ do
-          !sinks2Dispose <- readTVar disposalsVar
-          sequence_ $ flip postEvent EdhNil <$> Set.toList sinks2Dispose
-          void $ tryPutTMVar wkrEoL result
+        \ !result -> do
+          !chs2Dispose <- readTVarIO disposalsVar
+          sequence_ $ closeBChanIO <$> Set.toList chs2Dispose
+          void $ atomically $ tryPutTMVar wkrEoL result
   return $ EdhObject peerObj
 
 workerThread ::

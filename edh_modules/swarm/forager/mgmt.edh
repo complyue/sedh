@@ -29,26 +29,24 @@ export class WSC {
 
     # headcount reserved for this worksource
     this.hcReserved = 0
-    # headcount hired by the worksource, updated from the worksource,
-    # as its demands changed
-    this.hcEmployed = sink
+    # headcount hired by the worksource
+    this.hcEmployed = 0
+    # channel for updates from the worksource, as its demands changed
+    this.hcEmployedUpd = chan
 
     # all live worker processes by pid
     this.workers = {}
 
-    # stop signal for this wsc
-    this.stopped = sink
+    # stop signal (by eos) for this wsc
+    this.stopped = chan
 
-    # sparking sink of signals for reform requests
-    # note lingering copy of the event sink is discarded, for convenience of
-    # all for-from-do loops against `this.reformSignal` to be subsequential,
-    # but be aware `this.reformSignal.mrv` will always return nil
-    this.reformSignal = sink.subseq
+    # signals for reform requests
+    this.reformSignal = Semaphore()
   }
 
   method __repr__() {
     '<WorkTeamFor ' ++ this.addr ++ ' ' ++ this.workers.size ++ '/'
-    ++ this.hcEmployed.mrv ++ '/' ++ this.hcReserved
+    ++ this.hcEmployed ++ '/' ++ this.hcReserved
     ++ '/' ++ this.hcPlanned ++ '>'
   }
 
@@ -84,21 +82,14 @@ export class WSC {
             console.debug<| 'Disconnecting worksource ' ++ peer
           }
 
-          effect {
-            ; @dataSink = peer.armChannel( dataChan, this.hcEmployed )
-          }
-
-
-          # we'll identify ourself as a forager to the worksource, as soon as the WSC is ready to receive employment confirmation events from the channel sink
-          ; ( outlet= this.hcEmployed )|() =>* peer.postCommand( expr
-
+          # identify ourself as a forager to the worksource
+          peer.armChannel( dataChan, this.hcEmployedUpd )
+          peer.postCommand( expr
             OfferHeads( {$ senv.swarmManagerPid $}, {$ this.hcReserved $} )
-
           )
 
-          # start the team keeper, it'll subscribe to this.hcEmployed, thus to kick off the producer above
+          # start the team keeper
           that.startTeamKeeper()
-
 
           {
 
@@ -140,11 +131,11 @@ export class WSC {
   # this method meant to be run once per wsc
   method startTeamKeeper() go {
     # terminate this thread on stop signal
-    perceive this.stopped { break }
+    perceive this.stopped break
 
     # track delta of employment
     hcEmployed = 0
-    go for hcConfirmed from this.hcEmployed do {
+    go for hcConfirmed from this.hcEmployedUpd do {
       if hcConfirmed > this.hcReserved then error (
         'Worksource ' ++ this.addr ' confirming ' ++ hcConfirmed
         ++ ' while only ' ++ this.hcReserved ++ ' reserved.'
@@ -152,15 +143,15 @@ export class WSC {
       console.debug<| 'Worksource ' ++ this.addr ++ ' confirmed '
       ++ hcConfirmed ++ ' heads employed.'
       # TODO any deal with the delta ?
-      hcEmployed = hcConfirmed
+      hcEmployed = this.hcEmployed = hcConfirmed
       # request reform
-      this.reformSignal <- ()
+      this.reformSignal.inc()
     }
 
     # do reform upon appropriate chances
     while true {
       # wait next chance to reform
-      for () from this.reformSignal do break
+      this.reformSignal.waitAny()
       # keep enough worker processes running
       while this.workers.size < hcEmployed {
         wkrPid = wscStartWorker(
@@ -174,8 +165,8 @@ export class WSC {
   }
 
   method stop() {
-    this.hcEmployed <-nil
-    this.stopped <- true
+    this.hcEmployedUpd <-nil
+    this.stopped <-nil
 
     # forcefully stop all workers for this worksource
     for ( pid, _ ) from this.workers do {
@@ -185,7 +176,7 @@ export class WSC {
     }
 
     # check unleash heads reserved for this worksource
-    ai if this.hcReserved > 0 then {
+    if this.hcReserved > 0 then {
       this.forager.hcBackIdle <- this.hcReserved
       this.hcReserved = 0
     }
@@ -223,9 +214,11 @@ export class Forager {
     this.last_priority = -1
 
     # available headcounts to be offered
-    this.hcBackIdle = sink
+    this.hcBackIdle = chan
     # stream of `pid:wsc` for ever started worker processes
-    this.workerStarted = sink
+    this.workerStarted = chan
+    # waitable count of newly started workers
+    this.workerStartedCnt = Semaphore()
   }
 
   # A work source (e.g. a head hunter) should announce call-for-workers
@@ -285,19 +278,25 @@ export class Forager {
         # make sure it's remembered
         # note this perceiver preempts the loop below, so no race
         { ( wkrPid, wsc ) } -> workers[ wkrPid ] = wsc
+        # count for one
+        this.workerStartedCnt.inc()
       }
 
-      # for each worker process started, wait one exited
-      for _ from this.workerStarted
-      do case waitAnyWorkerDone() of {( donePid:doneAct:doneDesc )} -> {
-        console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
-        ++ ' - ' ++ doneDesc
-        case workers[ donePid ] of { doneWSC } -> ai {
-          # uncount this one from the team's number of working heads
-          doneWSC.workers[ donePid ] = nil
-          # request reform of the team
-          doneWSC.reformSignal <- ()
-          workers[ donePid ] = nil # forget about it
+      while true { # for each worker process started, wait one exited
+        # possible blocking intended, consume one from the counting semaphore
+        this.workerStartedCnt.wait()
+        # wait any os worker process exit
+        case waitAnyWorkerDone() of {( donePid:doneAct:doneDesc )} -> {
+          console.debug<| 'Swarm worker pid=' ++ donePid ++ ' ' ++ doneAct
+          ++ ' - ' ++ doneDesc
+          case workers[ donePid ] of { doneWSC } -> ai {
+            doneWSC =: WSC()
+            # uncount this one from the team's number of working heads
+            doneWSC.workers[ donePid ] = nil
+            # request reform of the team
+            doneWSC.reformSignal.inc()
+            workers[ donePid ] = nil # forget about it
+          }
         }
       }
     @}

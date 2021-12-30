@@ -8,38 +8,15 @@ import * 'swarm/headhunter'
 
 export producer manageBatchJobs(
   params, # generator or producer providing all ips
-  # finished jobs and their respective ips is posted into this sink
-  outlet,
+  outlet, # finished jobs and their respective ips is sent into this channel
 ) {
-
-  class BatchHunter { extends HeadHunter
-
-    export method SettleResult( ips, result, jobExc= None, ) {
-      if jobExc is None then return void outlet <- (ips,result)
-
-      # call the effectful failure callback
-      case perform @shouldRetryJob of {
-        false -> pass
-        true -> that.dispatchJob( ips )
-        { retryChk } -> case retryChk( jobExc, ips ) of { newIPS } -> {
-          that.dispatchJob( newIPS )
-        }
-      }
-    }
-
+  outlet <- nil # mark eos of it, so gwd can stop anyway this producer ends
+} <=@ {
+  hh = HeadHunter( outlet )
+  for@ ips from params() do {
+    console.debug<| 'Dispatching job ips=' ++ ips
+    hh.dispatchJob( ips ) # blocking wait the job dispatched
   }
-
-  hh = BatchHunter( outlet )
-
-  {
-    for@ ips from params() do {
-      console.debug<| 'Dispatching job ips=' ++ ips
-      # blocking wait the job dispatched
-      hh.dispatchJob( ips )
-    }
-    console.info<| 'All jobs sent out.'
-    hh.finishUp()
-  } @=> { # tell gwd to stop anyway
-    outlet <-nil
-  }
+  console.info<| 'All jobs sent out.'
+  hh.finishUp()
 }

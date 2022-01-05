@@ -84,7 +84,7 @@ export class HeadHunter {
     this.workerAvailable.inc()
   }
 
-  method __init__( resultCh as this.resultCh = chan ) {
+  method __init__( resultCh: chan as this.resultCh = chan ) {
     # fetch effective configurations, cache as instance attribute
     this.priority = perform priority
     this.headcount = perform headcount
@@ -98,10 +98,14 @@ export class HeadHunter {
     this.idleWorkers = [] # FILO queue
     this.pendingJobs = [] # FILO queue
     this.pendingCntr = Semaphore() # increased/decreased on job submit/result/err
-    this.finishingUp = Semaphore() # filled once no more jobs, i.e. to start finishing up
+    this.finishingUp = chan # EoS signaled once no more jobs, i.e. to start finishing up
     this.allReceived = Semaphore() # filled once all results received
 
     go {
+      perceive this.finishingUp { go { # eagerly check for finished once finishing up
+          do break if this.allFinished() for _ from console.everyMillis(200)
+      } }
+
       effect default swarmIface = '0.0.0.0'
       let server = Server(
         addr= perform swarmIface, # local addr to bind
@@ -190,7 +194,10 @@ export class HeadHunter {
   method allFinished() {
     if this.resultCh.eos then return true
 
-    if this.finishingUp and null(this.pendingCntr) and null(this.pendingJobs) then {
+    if this.finishingUp.eos
+    and null(this.pendingCntr)
+    and null(this.pendingJobs)
+    then {
       this.allReceived.put(1)
       this.resultCh <- nil
       return true
@@ -257,7 +264,7 @@ export class HeadHunter {
   }
 
   method finishUp() {
-    this.finishingUp.put(1)
+    this.finishingUp <-nil
     this.allReceived.wait(0)
   }
 

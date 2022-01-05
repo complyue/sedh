@@ -13,7 +13,7 @@ senv = { import _ 'swarm/ENV' }
 import * './wsq'
 
 
-# worksource connection, and the team of workers employed by it
+{## worksource connection, and the team of workers employed by it #}
 export class WSC {
 
   method __init__ (
@@ -37,11 +37,11 @@ export class WSC {
     # all live worker processes by pid
     this.workers = {}
 
-    # stop signal (by eos) for this wsc
-    this.stopped = chan
-
     # signals for reform requests
     this.reformSignal = Semaphore()
+
+    # stop signal (by eos) for this wsc
+    this.stopped = chan
   }
 
   method __repr__() {
@@ -130,8 +130,7 @@ export class WSC {
 
   # this method meant to be run once per wsc
   method startTeamKeeper() go {
-    # terminate this thread on stop signal
-    perceive this.stopped break
+    perceive this.stopped break # terminate this thread on stop signal
 
     # track delta of employment
     hcEmployed = 0
@@ -158,8 +157,8 @@ export class WSC {
           this.addr,
           this.workDir, this.executable, this.workModu,
         )
-        this.workers[ wkrPid ] = this
-        this.forager.workerStarted <- ( wkrPid, this )
+        this.workers[ wkrPid ] = that
+        this.forager.workerStarted <- ( wkrPid, that )
       }
     }
   }
@@ -177,7 +176,7 @@ export class WSC {
 
     # check unleash heads reserved for this worksource
     if this.hcReserved > 0 then {
-      this.forager.hcBackIdle <- this.hcReserved
+      this.forager.hcIdle.inc(this.hcReserved)
       this.hcReserved = 0
     }
     # forget about this worksource
@@ -204,21 +203,24 @@ export class Forager {
 
   method __init__( headcount as this.headcount, ) {
     this.headcount >= 1 or error( 'Invalid headcount: ' ++this.headcount )
-    this.hdIdle = this.headcount
+
+    # headcount(s) available to be offered
+    this.hcIdle = Semaphore(this.headcount)
 
     # prioritized recent queue for backlog of worksources
     this.wsq = PRQ()
     # worksources currently being actively worked on
     this.wsd = {}
 
-    this.last_priority = -1
+    this.lastPriority = -1
 
-    # available headcounts to be offered
-    this.hcBackIdle = chan
     # stream of `pid:wsc` for ever started worker processes
     this.workerStarted = chan
     # waitable count of newly started workers
     this.workerStartedCnt = Semaphore()
+
+    # stop signal (by eos) for this forager
+    this.stopped = chan
   }
 
   # A work source (e.g. a head hunter) should announce call-for-workers
@@ -230,7 +232,7 @@ export class Forager {
     workDir, # working directory
     workModu, # work definition module
     priority = 0, # used to prioritize allocation of work heads
-  ) {
+  ) void {
     # apply any filter in effect
     # todo only filtering by work modu so far, elaborate in the future
     if perform ignoreWorkModu( workModu ) then return nil
@@ -245,8 +247,8 @@ export class Forager {
     # such addr objects are non-equal from eachother in object semantics,
     # even from the same advertiser, so we use its repr str as identifier
     wsKey = repr( cfwAddr )
-    console.debug<| ( 'Got call for '++hcPlanned++' worker(s), with currently '
-      ++this.hdIdle++' head(s) idle.')
+    console.debug<| 'Got call for ' ++hcPlanned++ ' worker(s), with currently '
+    ++this.hcIdle.inv++ ' head(s) idle.'
     ai {
       case this.wsd[ wsKey ] of {
         { _ } -> pass # already been worked on TODO update info ?
@@ -262,11 +264,15 @@ export class Forager {
         }
       }
     }
-
-    return nil
   }
 
+  {## this is the long-running method of a forager service #}
   method scheduleTeams() {
+
+    defer { # upon forager shutdown, mark eos for various channels
+      this.workerStarted <-nil
+      this.stopped <-nil
+    }
 
     go {@
       # maintain mapping from pid of live worker processes to its team manager,
@@ -274,12 +280,11 @@ export class Forager {
       workers = {}
 
       perceive this.workerStarted {
-        nil -> break # assuming it'll go eos upon forager shutdown
-        # make sure it's remembered
-        # note this perceiver preempts the loop below, so no race
-        { ( wkrPid, wsc ) } -> workers[ wkrPid ] = wsc
-        # count for one
-        this.workerStartedCnt.inc()
+        nil -> break # eos upon forager shutdown
+        {( wkrPid, wsc )} -> {
+          workers[ wkrPid ] = wsc # make sure it's remembered
+          this.workerStartedCnt.inc() # count for one
+        }
       }
 
       while true { # for each worker process started, wait one exited
@@ -301,56 +306,54 @@ export class Forager {
       }
     @}
 
-    # start out to have the configured total headcount available
-    nsLastIdle = 0
-    # collect idle heads in a dedicated thread, to not miss any unleash
-    go for hcNewIdle from this.hcBackIdle do {
-      if hcNewIdle < 1 then continue
-      nsLastIdle = console.now()
-      ai this.hdIdle += hcNewIdle
-    }
-    # insert some zero idle counts periodicly, so the check in following loop
-    # won't dead wait in case it can only partial fill for a long time
-    go for _ from console.everySeconds( 1 ) do this.hcBackIdle <- 0
-
     # engage with next worksource in the queue of discovery
-    for wsc from this.wsq.streamOut() do {
-      wsc =: WSC()
+    for wsc: WSC from this.wsq.streamOut() do {
       console.debug<| 'Discovered new worksource: ' ++ wsc.addr
 
-      # do wait if can not immediately fulfill all the heads
-      if this.hdIdle < this.headcount and this.hdIdle < wsc.hcPlanned
-      then do break {# only #} if (
-        ( this.hdIdle >= wsc.hcPlanned or this.hdIdle >= this.headcount )
-        or # waited long enough while partial filling is possible
-        # TODO make the hardcoded 5 seconds tunable
-        ( this.hdIdle > 0 and console.now() - nsLastIdle > 5e9 )
-      ) for _ from this.hcBackIdle # recheck upon some hc come back idle
-
-      if wsc.priority < this.last_priority then {
+      ;| wsc.priority < this.lastPriority -> {
+        console.debug<| 'Giving a chance to the priority ' ++ this.lastPriority
+        ++ ' task just done to come back, before engaging this priority '
+        ++ wsc.priority ++ ' task.'
         # wait a minute if the next up queued task is of lower priority than
         # we've just done, give chance for higher priority tasks in a batch
         # fashion (i.e. multiple iterations with slight gap time) to hold the
         # heads before lower priority tasks get to run
         for _ from console.everySeconds(60) do break
-        this.last_priority = wsc.priority
+        this.lastPriority = wsc.priority
+      }
+
+      hcDemand = min( wsc.hcPlanned, this.headcount )
+
+      # first try fulfill the demand as a whole
+      case this.hcIdle.wait(
+        hcDemand, # try consume exactly that much demanded
+        timeout= 5e6, # TODO make the hardcoded 5 seconds tunable
+      ) of {_} -> { # full fill granted
+        console.debug<| 'Fully engaging worksource ' ++ wsc ++ ' with ' ++ hcDemand ++ ' heads to offer.'
+        this.lastPriority = wsc.priority
+        hcEngaged = wsc.engage( hcDemand )
+        if ( hcSpared = hcDemand - hcEngaged ) > 0 then {
+          this.hcIdle.inc(hcSpared)
+        }
         continue
       }
 
-      console.debug<| 'Engaging worksource ' ++ wsc ++ ' with '
-      ++ this.hdIdle ++ ' heads to offer.'
+      console.debug<| 'Full fill not possible, trying a partial fill ...'
+      pwsTime = console.now()
+      hcBackIdle = this.hcIdle.waitAny()
+      assert$ hcBackIdle > 0
+      ;| console.now() - pwsTime > 10e9 -> { # TODO make the 10 seconds threshold tunable
+        console.debug<| "It has been a while since started waiting idle heads for this worksource, I'm dropping it and to see what's off the top of my queue now."
+      }
+      console.debug<| 'Partially engaging worksource ' ++wsc++ ' with ' ++hcBackIdle++ ' heads to offer.'
+      this.lastPriority = wsc.priority
+      hcEngaged = wsc.engage( hcBackIdle )
+      if ( hcSpared = hcBackIdle - hcEngaged ) > 0 then {
+        this.hcIdle.inc(hcSpared)
+      }
 
-      # engage with this worksource with as many free heads atm
-      this.last_priority = wsc.priority
-      # `engage()` should return quickly without waiting for network, make it
-      # atomically-isolatedly in updating `this.hdIdle`
-      ai this.hdIdle -= wsc.engage( this.hdIdle )
     }
 
-    # todo this seems unreachable, add shutdown trigger?
-    # shutdown forager, mark eos for various event sinks
-    this.hcBackIdle <-nil
-    this.workerStarted <-nil
   }
 
 }

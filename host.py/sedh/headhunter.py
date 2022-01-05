@@ -39,12 +39,7 @@ class Forager:
 
 
 class Worker:
-    __slots__ = (
-        "peer",
-        "pid",
-        "manager",
-        "_jobs_quota_left",
-    )
+    __slots__ = ("peer", "pid", "manager", "_jobs_quota_left", "err_task")
 
     def __init__(self, peer: Peer, pid: int, forager_pid: int):
         self.peer = peer
@@ -52,7 +47,10 @@ class Worker:
         self.manager = forager_pid
         self._jobs_quota_left = 10  # TODO out as a param
 
-        err_sink = peer.armed_channel(ERR_CHAN)
+        peer.ensure_channel(DATA_CHAN)
+        err_chan = peer.ensure_channel(ERR_CHAN)
+        self.err_task = asyncio.create_task(err_chan.get())
+
         # convert disconnection without result to error
         def worker_disconn(eol: asyncio.Future):
             exc = None
@@ -60,8 +58,10 @@ class Worker:
                 exc = eol.exception()
             except (Exception, asyncio.CancelledError) as e:
                 exc = e
-            err_sink.publish(
-                exc or EdhPeerError(peer.ident, "Swarm worker disconnected")
+            asyncio.create_task(
+                err_chan.put(
+                    exc or EdhPeerError(peer.ident, "Swarm worker disconnected")
+                )
             )
 
         peer.eol.add_done_callback(worker_disconn)
@@ -85,15 +85,11 @@ class HeadHunter:
 
     def __init__(
         self,
-        result_sink: EventSink = None,
+        result_ch: Optional[BChan] = None,
         server_modu: str = "sedh.hh",
-        settle_result: Callable = None,
     ):
-        loop = asyncio.get_running_loop()
-
-        self.result_sink = result_sink or EventSink()
+        self.result_ch = result_ch or BChan()
         self.server_modu = server_modu
-        self.settle_result = settle_result
 
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
@@ -110,7 +106,8 @@ class HeadHunter:
 
         self.pending_jobs = []  # FILO queue
         self.pending_cntr = 0  # increased/decreased on job submit/result/err
-        self.finishing_up = False  # signal of no more jobs, i.e. to start finishing up
+        # signaled once no more jobs, i.e. to start finishing up
+        self.finishing_up = asyncio.Event()
 
         self.net_server = None
 
@@ -126,11 +123,16 @@ class HeadHunter:
             peer.stop()
 
     def all_finished(self) -> bool:
-        return self.finishing_up and self.pending_cntr == 0 and not self.pending_jobs
+        return (
+            self.finishing_up.is_set()
+            and self.pending_cntr == 0
+            and not self.pending_jobs
+        )
 
     def start_hunting(self):
         if self.hunting_task is None:
             self.hunting_task = asyncio.create_task(self._run())
+            self.hunting_task.add_done_callback(lambda _: self.result_ch.close())
         return self.hunting_task
 
     def __await__(self):
@@ -185,7 +187,7 @@ class HeadHunter:
 
     # a swarm node connection identifying itself as a worker
     async def StartWorking(self, worker_pid: int, forager_pid: int):
-        peer = effect(netPeer)
+        peer: Peer = effect(netPeer)
         logger.debug(
             f"Worker process pid={worker_pid} managed by {forager_pid} via {peer.ident} start working."
         )
@@ -201,7 +203,6 @@ class HeadHunter:
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
             modu["StartWorking"] = self.StartWorking
-            modu["SettleResult"] = self.settle_result
 
         server = await EdhServer(
             self.server_modu,
@@ -236,7 +237,7 @@ class HeadHunter:
 
         cfw_interval = effect("cfw_interval", 3)
 
-        while not self.all_finished():
+        while not self.finishing_up.is_set():
 
             # calibrate self.hc_employed, wrt forager disconnection etc.
             hc_employed = 0
@@ -248,7 +249,9 @@ class HeadHunter:
             if hc_employed != self.hc_employed:
                 logger.debug(f"HH has {hc_employed} heads employed now.")
                 self.hc_employed = hc_employed
-            logger.debug(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
+            logger.debug(
+                f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}"
+            )
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually
@@ -268,33 +271,22 @@ WorkToDo(
                 cfw_trans.sendto(pkt, (swarm_addr, swarm_port))
 
             await asyncio.wait(
-                [asyncio.sleep(cfw_interval), self.result_sink.one_more()],
+                [asyncio.sleep(cfw_interval), self.finishing_up.wait()],
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
+        while not self.all_finished():
+            await asyncio.sleep(0.2)
+
     async def track_job(self, worker: Worker, ips: Dict):
         peer = worker.peer
-        # arm a new private data/err channels to this job
-        job_sink = peer.arm_channel(DATA_CHAN)
-        # `asyncio.wait()` don't like a coroutine to appear in `aws` to it,
-        # create a task (a Future object per se) for tracking purpose
-        err_task = asyncio.create_task(peer.armed_channel(ERR_CHAN).one_more())
+        job_chan = peer.armed_channel(DATA_CHAN)
 
-        async def wait_result():
-            got_result = False
-            async for result in job_sink.run_producer(peer.p2c(DATA_CHAN, repr(ips))):
-                got_result = True
-                if worker.check_jobs_quota():
-                    self.idle_workers.append(worker)
-                    self.worker_available.set()
-                break  # one ips at a time
-            if not got_result:
-                raise EOFError("Premature end-of-stream")
-
-        wait_task = asyncio.create_task(wait_result())
         # submit ips and process result
+        wait_task = asyncio.create_task(job_chan.get())
+        await peer.p2c(DATA_CHAN, repr(ips))
         await asyncio.wait(
-            [wait_task, err_task],
+            [wait_task, worker.err_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
         # anyway it's not pending now
@@ -303,22 +295,22 @@ WorkToDo(
         jobExc = None
         if wait_task.done():
             try:
-                wait_task.result()  # propagate any error ever occurred
-                return  # job done successfully
+                result = wait_task.result()  # propagate any error ever occurred
+                # job done successfully
+                if worker.check_jobs_quota():
+                    self.idle_workers.append(worker)
+                    self.worker_available.set()
+                await self.result_ch.put((ips, result))
+                return
             except Exception as jobExc:
                 pass
 
         # this job didn't make it
         peer.stop()  # disconnect this worker anyway if no-result
 
-        # let off `wait_result()`, or it's leaked
-        job_sink.publish(EndOfStream)
-
         try:
-            if err_task.done():
-                jobExc = err_task.result()
-            else:
-                err_task.cancel()  # prevent leakage
+            if worker.err_task.done():
+                jobExc = worker.err_task.result()
         except Exception as jobExc:
             pass
 
@@ -387,7 +379,7 @@ WorkToDo(
         await self.submit_jobs()
 
     async def finish_up(self):
-        self.finishing_up = True
+        self.finishing_up.set()
         if self.all_finished():
             return
         await self.hunting_task

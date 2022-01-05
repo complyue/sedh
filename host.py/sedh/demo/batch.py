@@ -63,7 +63,10 @@ else:
         ts = time.monotonic()
 
         # prepare the result to be returned
-        result = dict(r=r, ts=ts,)
+        result = dict(
+            r=r,
+            ts=ts,
+        )
         logger.debug(f"Returning result {result!r}")
 
         return result
@@ -79,7 +82,7 @@ async def manage_this_work(**param_overrides):
     globals().update(param_overrides)
 
     # seems that defining effects here doesn't work, may due to `create_task()`
-    # in the `run_producer()` implementation breaks the async call stack
+    # would break the async call stack
     #
     # while `effect_import()` this work definition module from the work script
     # file is a workaround so far
@@ -90,13 +93,14 @@ async def manage_this_work(**param_overrides):
             for n in n_range():
                 if not exclude(m, n):
                     yield dict(
-                        m=m, n=n,
+                        m=m,
+                        n=n,
                     )
 
-    result_sink = EventSink()
-    async for (ips, result) in result_sink.run_producer(
-        manage_batch_jobs(iter_params, result_sink)
-    ):
+    result_ch = BChan()
+    asyncio.create_task(manage_batch_jobs(iter_params, result_ch))
+    async for (ips, result) in result_ch.stream():
+
         logger.info(f"Job computed. ips={ips!r}, result={result!r}")
 
     logger.info("All done.")
@@ -107,4 +111,3 @@ __all_symbolic__ = {
     doOneJob: doOneJob_,
     shouldRetryJob: shouldRetryJob_,
 }
-

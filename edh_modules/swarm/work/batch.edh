@@ -10,8 +10,8 @@ export producer manageBatchJobs(
   params, # generator or producer providing all ips
   outlet, # finished jobs and their respective ips is sent into this channel
 ) {
-  outlet <- nil # mark eos of it, so gwd can stop anyway this producer ends
-} <=@ {
+  defer outlet <- nil # mark eos on termination, so gwd can stop anyway
+
   hh = HeadHunter( outlet )
   for@ ips from params() do {
     console.debug<| 'Dispatching job ips=' ++ ips

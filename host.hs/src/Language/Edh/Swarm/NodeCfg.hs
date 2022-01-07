@@ -58,22 +58,12 @@ wrapNodeCfg (NodeCfg !src _tsCfg !attrs !boot) =
               (AttrByName "boot", maybe edhNone EdhBlob boot)
             ]
 
-createNodeRegClass :: Edh Object
-createNodeRegClass =
-  mkEdhClass' "NodeReg" nregAllocator [] $ do
-    !mths <-
-      sequence
-        [ (AttrByName nm,) <$> mkEdhProc vc nm hp
-          | (nm, vc, hp) <-
-              [ ("__repr__", EdhMethod, wrapEdhProc nregReprProc),
-                ("cfgOf", EdhMethod, wrapEdhProc nregCfgOfProc),
-                ("saveCfgSrc", EdhMethod, wrapEdhProc saveCfgSrcProc),
-                ("knownNodes", EdhGnrtor, wrapEdhProc nregKnownNodesProc)
-              ]
-        ]
-
-    !clsScope <- contextScope . edh'context <$> edhThreadState
-    iopdUpdateEdh mths $ edh'scope'entity clsScope
+defineNodeRegClass :: Edh ()
+defineNodeRegClass = defEdhClass'_ "NodeReg" nregAllocator [] $ do
+  defEdhProc'_ EdhMethod "__repr__" nregReprProc
+  defEdhProc'_ EdhMethod "cfgOf" nregCfgOfProc
+  defEdhProc'_ EdhMethod "saveCfgSrc" saveCfgSrcProc
+  defEdhProc'_ EdhGnrtor "knownNodes" nregKnownNodesProc
   where
     nregAllocator ::
       "cfgDefault" !: EdhValue ->

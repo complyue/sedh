@@ -26,23 +26,10 @@ systemProc (mandatoryArg -> !cmd) =
 
 installSwarmCtrlBatteries :: EdhWorld -> IO ()
 installSwarmCtrlBatteries !world = runProgramM_ world $ do
-  installModuleM_ "swarm/CTRL" $ do
-    !moduScope <- contextScope . edh'context <$> edhThreadState
-
-    !nregClass <- createNodeRegClass
-
-    !moduMths <-
-      sequence $
-        [ (AttrByName nm,) <$> mkEdhProc mc nm hp
-          | (nm, mc, hp) <-
-              [("system", EdhMethod, wrapEdhProc systemProc)]
-        ]
-
-    let !moduArts = (AttrByName "NodeReg", EdhObject nregClass) : moduMths
-
-    iopdUpdateEdh moduArts $ edh'scope'entity moduScope
-    !esExps <- prepareExpStoreM (edh'scope'this moduScope)
-    iopdUpdateEdh moduArts esExps
+  installModuleM_ "swarm/CTRL" $
+    exportM_ $ do
+      defineNodeRegClass
+      defEdhProc'_ EdhMethod "system" systemProc
 
 installSwarmBatteries :: SwarmWorkStarter -> EdhWorld -> IO ()
 installSwarmBatteries
@@ -73,36 +60,13 @@ installSwarmBatteries
         (edh'scope'entity moduScope)
 
     installModuleM_ "swarm/RT" $ do
-      !moduScope <- contextScope . edh'context <$> edhThreadState
-
       -- loosely depend on the @net@ runtime from nedh project
       !peerClass <- getPeerClass
-      !moduArts <-
-        sequence $
-          [ (AttrByName nm,) <$> mkEdhProc mc nm hp
-            | (nm, mc, hp) <-
-                [ ( "killWorker",
-                    EdhMethod,
-                    wrapEdhProc killWorkerProc
-                  ),
-                  ( "wscTake",
-                    EdhMethod,
-                    wrapEdhProc $ wscTakeProc peerClass
-                  ),
-                  ( "waitAnyWorkerDone",
-                    EdhMethod,
-                    wrapEdhProc waitAnyWorkerDoneProc
-                  ),
-                  ( "wscStartWorker",
-                    EdhMethod,
-                    wrapEdhProc wscStartWorkerProc
-                  )
-                ]
-          ]
-
-      iopdUpdateEdh moduArts $ edh'scope'entity moduScope
-      !esExps <- prepareExpStoreM (edh'scope'this moduScope)
-      iopdUpdateEdh moduArts esExps
+      exportM_ $ do
+        defEdhProc'_ EdhMethod "killWorker" killWorkerProc
+        defEdhProc'_ EdhMethod "wscTake" $ wscTakeProc peerClass
+        defEdhProc'_ EdhMethod "waitAnyWorkerDone" waitAnyWorkerDoneProc
+        defEdhProc'_ EdhMethod "wscStartWorker" killWorkerProc
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization = do

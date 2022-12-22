@@ -248,7 +248,7 @@ class HeadHunter:
             if hc_employed != self.hc_employed:
                 logger.debug(f"HH has {hc_employed} heads employed now.")
                 self.hc_employed = hc_employed
-            logger.debug(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
+            logger.info(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually
@@ -279,7 +279,8 @@ WorkToDo(
         # `asyncio.wait()` don't like a coroutine to appear in `aws` to it,
         # create a task (a Future object per se) for tracking purpose
         err_task = asyncio.create_task(peer.armed_channel(ERR_CHAN).one_more())
-
+        # worker_ip = eval(worker.peer.ident)[0]
+        # logger.info(F"IP[{worker_ip}]---ips={ips}")
         async def wait_result():
             got_result = False
             async for result in job_sink.run_producer(peer.p2c(DATA_CHAN, repr(ips))):
@@ -289,23 +290,26 @@ WorkToDo(
                     self.worker_available.set()
                 break  # one ips at a time
             if not got_result:
-                raise EOFError("Premature end-of-stream")
+                raise EOFError("未能收回当前参数的结果")
 
         wait_task = asyncio.create_task(wait_result())
         # submit ips and process result
-        await asyncio.wait(
+        timeout_ = ips["timeout"] if "timeout" in ips else None
+        done, pending = await asyncio.wait(
             [wait_task, err_task],
+            timeout=timeout_,
             return_when=asyncio.FIRST_COMPLETED,
         )
         # anyway it's not pending now
         self.pending_cntr -= 1
         # capture any possible exception that has failed the job
         jobExc = None
-        if wait_task.done():
+        if wait_task in done:
             try:
                 wait_task.result()  # propagate any error ever occurred
                 return  # job done successfully
-            except Exception as jobExc:
+            except Exception as exc:
+                jobExc = exc
                 pass
 
         # this job didn't make it
@@ -314,12 +318,25 @@ WorkToDo(
         # let off `wait_result()`, or it's leaked
         job_sink.publish(EndOfStream)
 
+        # 将以下三个参数放入ips中
+        # timeout: 超时时间，单位:秒    
+        # retry_cnt: 重试次数
+        # retry_maxN: 最大重试次数限制
+        
+        if "retry_cnt" in ips and "retry_maxN" in ips:
+            if ips["retry_cnt"] >= ips["retry_maxN"]:
+                logger.error(f"当前参数重跑次数已满，请检查参数正确性!  ips={ips}")
+                return
+            ips["retry_cnt"] += 1
+            if err_task not in done:
+                logger.warning(f"当前参数已超时，开始重跑，当前尝试次数{ips['retry_cnt']}  ips={ips}")
         try:
-            if err_task.done():
+            if err_task in done:
                 jobExc = err_task.result()
             else:
                 err_task.cancel()  # prevent leakage
-        except Exception as jobExc:
+        except Exception as exc:
+            jobExc = exc
             pass
 
         try:
@@ -333,6 +350,9 @@ WorkToDo(
                     new_ips = await maybe_coro
                 else:
                     new_ips = maybe_coro
+                if new_ips is None:
+                    logger.info("ips is None!抛弃该组任务！！")
+                    return
                 logger.info(f"retry job for ips={ips}")
                 self.pending_jobs.append(new_ips)
         except Exception:
@@ -388,9 +408,16 @@ WorkToDo(
 
     async def finish_up(self):
         self.finishing_up = True
-        if self.all_finished():
-            return
-        await self.hunting_task
+        while True:
+            if self.all_finished():
+                return
+            if self.pending_jobs:
+                await self.submit_jobs()
+            if self.hunting_task.done():
+                # propagate any error ever occurred
+                await self.hunting_task
+                return
+            await asyncio.sleep(2)
 
 
 class WorkAnnouncingProtocol(asyncio.DatagramProtocol):

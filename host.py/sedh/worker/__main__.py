@@ -77,7 +77,7 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
                 await peer.post_command(
                     expr("""SettleResult( {$ ips $}, {$ result['res'] $}, {$ None $} )""")
                 )
-                # await peer.p2c(DATA_CHAN, None)
+                await peer.p2c(DATA_CHAN, None)
             except Exception as job_exc:
                 logger.error(
                     f"Swarm worker failed computing result for ips: {ips}",
@@ -86,7 +86,7 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
                 await peer.post_command(
                     expr("""SettleResult( {$ ips $}, {$ None $}, {$ job_exc $} )""")
                 )
-                # await peer.p2c(ERR_CHAN, repr(repr(job_exc)))
+                await peer.p2c(ERR_CHAN, repr(repr(job_exc)))
                 break  # stop processing more jobs
 
     # apks are expected to be posted to a worker's data channel, one by one

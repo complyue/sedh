@@ -16,25 +16,24 @@ senv = import _ 'swarm/ENV'
 
 export class HeadHunter {
 
-  data Forager ( peer, pid ) {
-    hcEmployed = 0
-    hcWorking = 0
+  class Forager {
+    method __init__( peer as this.peer, pid as this.pid ) {
+      this.hcEmployed = 0
+      this.hcWorking = 0
+    }
   }
 
-  class Worker {
-    method __init__(
-      peer as this.peer,
-      workerPid as this.pid,
-      foragerPid as this.manager,
-    ) {
-      errSink = this.peer.armChannel( errChan )
+  data Worker( peer: Peer, pid, manager ) {
+    method __init__(***) {
+      this.peer.armChannel( dataChan )
+      ech = this.peer.armChannel( errChan )
       # convert disconnection without result to error
       go {
         discExc = None
         this.peer.join() $=> {
           { discExc } -> pass
         }
-        errSink <- discExc or PeerError( 'Swarm worker disconnected' )
+        ech <- discExc or PeerError( 'Swarm worker disconnected' )
       }
     }
 
@@ -44,10 +43,9 @@ export class HeadHunter {
   }
 
   # a swarm node connection identifying itself as a forager
-  export method OfferHeads(
-    foragerPid, maxHC,
-  ) {
+  export method OfferHeads( foragerPid, maxHC, ) void {
     peer = perform @netPeer
+    peer =: Peer()
 
     ai { # calculate number of employment atomically
       hcDemand = this.headcount - this.hcEmployed
@@ -61,36 +59,32 @@ export class HeadHunter {
     # employ heads from this forager
     ai case this.foragers[ peer ] of {
       nil -> {
-        forager = Forager(
-          peer, foragerPid,
-        )
+        forager = Forager( peer, foragerPid, )
         this.foragers[ peer ] = forager
       }
-      { forager } -> pass
+      { forager } -> { # just prototype it for IntelliSense
+        forager =: Forager()
+      }
     }
     forager.hcEmployed += hcToEmploy
     console.debug<| 'HH is hiring ' ++ forager.hcEmployed ++ ' heads from '
     ++ peer.ident ++ ' now.'
     peer.p2c( dataChan, repr( forager.hcEmployed ) )
-
-    return nil
   }
 
   # a swarm node connection identifying itself as a worker
-  export method StartWorking(
-    workerPid, foragerPid,
-  ) {
+  export method StartWorking( workerPid, foragerPid, ) void {
     peer = perform @netPeer
+    peer =: Peer()
 
     console.debug<| 'Worker process pid=' ++ workerPid ++ ' managed by '
     ++ foragerPid ++ ' via ' ++ peer.ident ++ ' start working.'
     worker = Worker( peer, workerPid, foragerPid )
     this.idleWorkers.push( worker )
-    this.workerAvailable <- worker
-    return nil
+    this.workerAvailable.inc()
   }
 
-  method __init__( resultSink as this.resultSink = sink ) {
+  method __init__( resultCh: chan as this.resultCh = chan ) {
     # fetch effective configurations, cache as instance attribute
     this.priority = perform priority
     this.headcount = perform headcount
@@ -100,15 +94,18 @@ export class HeadHunter {
     this.hcEmployed = 0
     # data structures for job scheduling
     this.foragers = {}
-    this.workerAvailable = sink # signal on new worker available,
-    # but should obtain an available worker from idleWorkers with tx
+    this.workerAvailable = Semaphore() # inventory of newly available workers
     this.idleWorkers = [] # FILO queue
     this.pendingJobs = [] # FILO queue
-    this.pendingCntr = sink # increased/decreased on job submit/result/err
-    this.pendingCntr <- 0 # initialize to be zero
-    this.finishingUp = sink # signal of no more jobs, i.e. to start finishing up
+    this.pendingCntr = Semaphore() # increased/decreased on job submit/result/err
+    this.finishingUp = chan # EoS signaled once no more jobs, i.e. to start finishing up
+    this.allReceived = Semaphore() # filled once all results received
 
     go {
+      perceive this.finishingUp { go { # eagerly check for finished once finishing up
+          do break if this.allFinished() for _ from console.everyMillis(200)
+      } }
+
       effect default swarmIface = '0.0.0.0'
       let server = Server(
         addr= perform swarmIface, # local addr to bind
@@ -124,19 +121,14 @@ export class HeadHunter {
           console.debug<| 'Disconnecting swarm forager/worker ' ++ peer
         }
 
-        effect {
-          ; @dataSink = peer.armChannel( dataChan ?:= 'data' )
-        }
-
         {
 
-          while peer.eol() is false case peer.readCommand() of {
+          while peer.eol() is false case peer.readCommand() of {@
             # sequence of commands each resulting in nil are expected and let pass here
             { cmdVal } -> {
-              console.warn<| 'Unexpected cmd from ' ++ peer ++ '\n  ' ++ cmdVal
-              cmdVal = nil # clear it
+              console.warn<| 'Unexpected cmd from ' ++peer++ '\n  ' ++cmdVal
             }
-          }
+          @}
 
         } @=> { exc } -> {
           console.warn<| 'Exception by swarm forager/worker ' ++ peer
@@ -167,15 +159,14 @@ export class HeadHunter {
         wait1st=false, # announce the first CFW immediately
       ) do {
         # check if all have finished
-        this.allFinished() -> break
+        do break if this.allFinished()
 
         # calibrate this.hcEmployed, wrt forager disconnection etc.
         hcEmployed = 0
-        for ( peer, forager ) from this.foragers
         do case peer.eol() of {
           false -> hcEmployed += forager.hcEmployed
           this.foragers[ peer ] = nil # forget about it
-        }
+        } for@ ( peer: Peer, forager: Forager ) from this.foragers
         if this.hcEmployed != hcEmployed then {
           console.debug<| 'HH has ' ++ hcEmployed ++ ' heads employed now.'
           this.hcEmployed = hcEmployed
@@ -183,8 +174,7 @@ export class HeadHunter {
 
         hcDemand = this.headcount - hcEmployed
         if hcDemand > 0 then {
-          console.debug<| 'Calling ' ++ hcDemand ++ ' workers from '
-          ++ cfw.addrs()
+          console.debug<| 'Calling ' ++ hcDemand ++ ' workers from ' ++ cfw.addrs()
           cfw.post( expr
 
             WorkToDo(
@@ -202,22 +192,21 @@ export class HeadHunter {
   }
 
   method allFinished() {
-    this.resultSink.eos -> true
+    if this.resultCh.eos then return true
 
-    if this.finishingUp.mrv is true
-    && this.pendingCntr.mrv is 0
-    && null( this.pendingJobs )
+    if this.finishingUp.eos
+    and null(this.pendingCntr)
+    and null(this.pendingJobs)
     then {
-      this.resultSink <-nil
+      this.allReceived.put(1)
+      this.resultCh <- nil
       return true
     }
 
     return false
   }
 
-  method trackJob( worker, ips ) {
-    # arm a new private data channel to this job
-    jobSink = worker.peer.armChannel( dataChan )
+  method trackJob( worker: Worker, ips ) {
     # perform retry effect on error
     perceive worker.peer.armedChannel( errChan ) { jobExc } -> {
       worker.peer.stop() # disconnect this worker anyway on error
@@ -232,49 +221,40 @@ export class HeadHunter {
       }
 
       # failed to get a result, but we know it's not pending now
-      if jobSink.mrv is nil then {
-        ai this.pendingCntr <- this.pendingCntr.mrv - 1
-        jobSink <-nil
-      }
+      this.pendingCntr.dec()
 
       break # terminate this thread
     }
-    # submit ips and process result
-    for result from (outlet= jobSink )|() =>* {
-      worker.peer.p2c( dataChan, repr( ips ) )
-    } do {
-      this.resultSink <- ( ips, result )
-      ai this.pendingCntr <- this.pendingCntr.mrv - 1
-      this.idleWorkers.push( worker )
-      this.workerAvailable <- worker
-      break # one ips at a time
-    }
+
+    # submit ips and receive result then forward to global result channel
+    worker.peer.p2c( dataChan, repr( ips ) )
+    let result = <- worker.peer.armedChannel( dataChan )
+    this.resultCh <- ( ips, result )
+    this.pendingCntr.dec()
+    this.idleWorkers.push( worker )
+    this.workerAvailable.inc()
   }
 
-  method submitJobs() {
+  method submitJobs() while true {
+    ips = this.pendingJobs.pop()
+    if ips is None then return nil # no more pending jobs
+    this.pendingCntr.inc()
+
     while true {
-      ips = this.pendingJobs.pop()
-      ips is None -> return nil # no more pending jobs
-      ai this.pendingCntr <- this.pendingCntr.mrv + 1
-
-      while true {
-        # try grab a present idle worker and assign it this job
-        worker = this.idleWorkers.pop()
-        worker != None -> {
-          console.debug<| 'Job assigned to ' ++ worker ++ ' - ' ++ ips
-          # start asynchronous concurrency
-          go trackJob( worker, ips )
-          break # this job settled, proceed to next job
-        }
-
-        # no immediate idle worker, need to wait
-        console.debug<| 'Wait for idle workers.'
-        # wait until new idle workers appear
-        for _ from this.workerAvailable do {
-          not null( this.idleWorkers ) -> break
-        }
-        console.debug<| 'Got idle workers.'
+      # try grab a present idle worker and assign it this job
+      worker = this.idleWorkers.pop()
+      if worker then {
+        console.debug<| 'Job assigned to ' ++ worker ++ ' - ' ++ ips
+        # start asynchronous concurrency
+        go trackJob( worker, ips )
+        break # this job settled, proceed to next job
       }
+
+      # no immediate idle worker, need to wait
+      console.debug<| 'Wait for idle workers.'
+      # wait until new idle workers appear
+      while null(this.idleWorkers) this.workerAvailable.waitAny()
+      console.debug<| 'Got idle workers.'
     }
   }
 
@@ -284,11 +264,8 @@ export class HeadHunter {
   }
 
   method finishUp() {
-    this.finishingUp <- true
-
-    perceive this.pendingCntr.subseq 0 -> this.allFinished()
-
-    for (*** _ ) from this.resultSink do { pass }
+    this.finishingUp <-nil
+    this.allReceived.wait(0)
   }
 
 }

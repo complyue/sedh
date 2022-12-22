@@ -47,30 +47,30 @@ export class PRQ {
     this.pv = []
 
     # queue change signal
-    this.qcSignal = sink?subseq
+    this.qcSignal = Semaphore()
   }
 
   generator streamOut() while true {
     ai {
-      case this.pv of {
-        { pcrq :> rest'pv } -> case pcrq of { ( _priority, crq ) }
-        -> case crq.deq() of {
-          { wsc } -> if crq.empty() then {
-            # no more record at this priority
-            this.pv = rest'pv # forget this crq
+      wsc = None
+      case this.pv.pop() of {
+        { ( priority, crq ) } -> {
+          case crq.deq() of {
+            { wsc } -> # got an wsc from the queue at that top priority
+            do this.pv.push( ( priority, crq ) ) # keep this crq,
+            if not crq.empty() # for its rest items
+            # or there's no more record at this priority, leave it popped out, so the next priority level becomes top
           }
-          error( 'bug: empty CRQ in PRQ' )
         }
-        # empty PRQ
-        wsc = None
+        # or we have an empty PRQ now, let's fall through to wait qcSignal
       }
     }
     if wsc is not None then {
       yield wsc # engagement with this worksource expected
       continue
     }
-    # wait until queue changed
-    for () from this.qcSignal do break
+    this.qcSignal.clear() # reaching here, all pendings assumed processed
+    this.qcSignal.waitAny() # wait until queue further changed
   }
 
   method enque( wsc ) ai {
@@ -78,7 +78,7 @@ export class PRQ {
     crq.enq( wsc ) -> {
       this.iqd[ wsc.key() ] = wsc
       # signal the queue changed
-      this.qcSignal <- ()
+      this.qcSignal.inc()
     }
     console.warn<| 'Worksource backlog queue full, dropping ' ++ wsc
   }

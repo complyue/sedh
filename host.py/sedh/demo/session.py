@@ -66,7 +66,13 @@ async def doSthInSession(sid, num):
     logger.info(f"Doing thing #{num} in session: {sid} ...")
     await peer.p2c(
         "ch325",
-        repr({"session": sid, "number": num, "worker_local_cntr": worker_cntr,}),
+        repr(
+            {
+                "session": sid,
+                "number": num,
+                "worker_local_cntr": worker_cntr,
+            }
+        ),
     )
     worker_cntr += 1
 
@@ -82,7 +88,7 @@ async def run_sessions(**param_overrides):
     hh.start_hunting()
 
     hh_cntr = 0
-    ch325 = EventSink()
+    ch325 = BChan()
 
     async def run_session(sid):
         nonlocal hh_cntr
@@ -116,16 +122,13 @@ doSthInSession( {$ sid $}, {$ hh_cntr $} )
             loop.create_task(run_session(sid))
 
     # show stream of ch325 forever
-    while True:
-        try:
-            async for ch325_evt in ch325.run_producer(spawn_sessions(2)):
-                logger.info(f"Got sth from channel 325: {ch325_evt}")
-        except:
-            logger.error("Channel closed due to disconnection", exc_info=True)
-            await asyncio.sleep(5)
-
-        # allocate a new sink
-        ch325 = EventSink()
+    asyncio.create_task(spawn_sessions(2))
+    try:
+        async for ch325_evt in ch325.stream():
+            logger.info(f"Got sth from channel 325: {ch325_evt}")
+    except:
+        logger.error("Channel closed due to disconnection", exc_info=True)
+        await asyncio.sleep(5)
 
 
 __all_symbolic__ = {

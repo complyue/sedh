@@ -22,7 +22,7 @@ async def _run_():
 
     peer = await takeEdhFd(sedh.senv.wscFd())
 
-    jobSink = peer.ensure_channel(DATA_CHAN)
+    peer.ensure_channel(DATA_CHAN)
 
     import nedh.effects
 
@@ -31,7 +31,6 @@ async def _run_():
     effect(
         {
             netPeer: peer,
-            dataSink: peer.ensure_channel(DATA_CHAN),
         }
     )
 
@@ -50,9 +49,10 @@ async def _run_():
 
     is_coro_job = inspect.iscoroutinefunction(doOneJob_)
 
-    # identify this connection as swarm worker to the headhunter, then it will
-    # start sending ips to our data channel
-    async def initiate_jobs():
+    async def process_jobs():
+        jobs_ch = peer.ensure_channel(DATA_CHAN)
+        # identify this connection as swarm worker to the headhunter,
+        # then it will start sending ips to our data channel
         await peer.post_command(
             expr(
                 """
@@ -61,8 +61,7 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
             )
         )
 
-    async def process_jobs():
-        async for ips in jobSink.run_producer(initiate_jobs()):
+        async for ips in jobs_ch.stream():
             logger.debug(f"Swarm worker received ips: {ips}")
 
             try:
@@ -77,7 +76,8 @@ StartWorking( {$ sedh.senv.swarmWorkerPid $}, {$ sedh.senv.swarmManagerPid $} )
                 await peer.post_command(
                     expr("""SettleResult( {$ ips $}, {$ result['res'] $}, {$ None $} )""")
                 )
-                await peer.p2c(DATA_CHAN, None)
+                # await peer.p2c(DATA_CHAN, None)
+                await peer.p2c(DATA_CHAN, repr(result))
             except Exception as job_exc:
                 logger.error(
                     f"Swarm worker failed computing result for ips: {ips}",

@@ -87,9 +87,11 @@ class HeadHunter:
         self,
         result_ch: Optional[BChan] = None,
         server_modu: str = "sedh.hh",
+        settle_result: Callable = None,
     ):
         self.result_ch = result_ch or BChan()
         self.server_modu = server_modu
+        self.settle_result = settle_result
 
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
@@ -203,6 +205,7 @@ class HeadHunter:
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
             modu["StartWorking"] = self.StartWorking
+            modu["SettleResult"] = self.settle_result
 
         server = await EdhServer(
             self.server_modu,
@@ -330,8 +333,8 @@ WorkToDo(
                     self.worker_available.set()
                 await self.result_ch.put((ips, result))
                 return
-            except Exception as jobExc:
-                pass
+            except Exception as exc:
+                jobExc = exc
 
         # this job didn't make it
         peer.stop()  # disconnect this worker anyway if no-result

@@ -20,9 +20,10 @@ logger = log.get_logger(__name__)
 async def manage_batch_jobs(
     params: Callable[[], Iterable[Dict]],
     outlet: BChan,
+    settle_result: Callable,
 ):
     try:
-        hh = HeadHunter(outlet)
+        hh = HeadHunter(outlet, settle_result=settle_result)
         hh.start_hunting()
         async for ips in params():
             logger.debug(f"Dispatching job ips={ips!r}")

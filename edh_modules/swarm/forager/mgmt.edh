@@ -279,12 +279,13 @@ export class Forager {
       # and track done of worker processes as well
       workers = {}
 
-      perceive this.workerStarted {
+      go for@ ( wkrPid, wsc ) from this.workerStarted do {
+        workers[ wkrPid ] = wsc # make sure it's remembered
+        this.workerStartedCnt.inc() # count for one
+      }
+
+      perceive this.stopped {
         nil -> break # eos upon forager shutdown
-        {( wkrPid, wsc )} -> {
-          workers[ wkrPid ] = wsc # make sure it's remembered
-          this.workerStartedCnt.inc() # count for one
-        }
       }
 
       while true { # for each worker process started, wait one exited

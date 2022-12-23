@@ -66,7 +66,7 @@ installSwarmBatteries
         defEdhProc'_ EdhMethod "killWorker" killWorkerProc
         defEdhProc'_ EdhMethod "wscTake" $ wscTakeProc peerClass
         defEdhProc'_ EdhMethod "waitAnyWorkerDone" waitAnyWorkerDoneProc
-        defEdhProc'_ EdhMethod "wscStartWorker" killWorkerProc
+        defEdhProc'_ EdhMethod "wscStartWorker" wscStartWorkerProc
 
 startSwarmWork :: (EdhWorld -> IO ()) -> IO ()
 startSwarmWork !worldCustomization = do

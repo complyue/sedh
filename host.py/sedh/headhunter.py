@@ -433,21 +433,21 @@ WorkToDo(
         await self.submit_jobs()
 
     async def finish_up(self):
-        # self.finishing_up = True
-        # while True:
-        #     if self.all_finished():
-        #         return
-        #     if self.pending_jobs:
-        #         await self.submit_jobs()
-        #     if self.hunting_task.done():
-        #         # propagate any error ever occurred
-        #         await self.hunting_task
-        #         return
-        #     await asyncio.sleep(2)
         self.finishing_up.set()
-        if self.all_finished():
-            return
-        await self.hunting_task
+        while True:
+            if self.all_finished():
+                return
+            if self.pending_jobs:
+                await self.submit_jobs()
+            if self.hunting_task.done():
+                # propagate any error ever occurred
+                await self.hunting_task
+                return
+            await asyncio.sleep(2)
+        # self.finishing_up.set()
+        # if self.all_finished():
+        #     return
+        # await self.hunting_task
 
 
 class WorkAnnouncingProtocol(asyncio.DatagramProtocol):

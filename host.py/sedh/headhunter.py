@@ -89,7 +89,7 @@ class HeadHunter:
     ):
         self.result_ch = result_ch or BChan()
         self.server_modu = server_modu
-        self.settle_result = settle_result
+        self._settle_result = settle_result
 
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
@@ -110,6 +110,9 @@ class HeadHunter:
         self.finishing_up = asyncio.Event()
 
         self.net_server = None
+        
+    def settle_result(self, ips: dict, result: object = None, err_reason=None):
+        self._settle_result(ips, result, err_reason)
 
     def stop(self):
         server = self.net_server

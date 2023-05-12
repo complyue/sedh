@@ -64,10 +64,10 @@ else:
 
         # prepare the result to be returned
         result = dict(
-            r=r,
+            res=r,
             ts=ts,
         )
-        logger.debug(f"Returning result {result!r}")
+        logger.info(f"Returning result {result!r}")
 
         return result
 
@@ -88,7 +88,7 @@ async def manage_this_work(**param_overrides):
     # file is a workaround so far
     effect(__all_symbolic__)
 
-    async def iter_params():
+    async def iterate_params():
         for m in m_range():
             for n in n_range():
                 if not exclude(m, n):
@@ -97,11 +97,12 @@ async def manage_this_work(**param_overrides):
                         n=n,
                     )
 
-    result_ch = BChan()
-    asyncio.create_task(manage_batch_jobs(iter_params, result_ch))
-    async for (ips, result) in result_ch.stream():
+    def settle_result(ips: dict, result: object = None, err_reason=None):
+        logger.info(f"ips={ips}-----result={result}")
+        pass
 
-        logger.info(f"Job computed. ips={ips!r}, result={result!r}")
+    result_sink = BChan()
+    await manage_batch_jobs(iterate_params, result_sink, settle_result, headhunter)
 
     logger.info("All done.")
 

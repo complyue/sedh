@@ -102,7 +102,7 @@ async def manage_this_work(**param_overrides):
         pass
 
     result_sink = BChan()
-    await manage_batch_jobs(iterate_params, result_sink, settle_result, headhunter)
+    await manage_batch_jobs(iterate_params, result_sink, settle_result, hh=headhunter)
 
     logger.info("All done.")
 

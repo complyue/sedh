@@ -62,6 +62,7 @@ async def start_hh():
     hh.start_hunting()
     for i in range(5):
         await manage_this_work(headhunter=hh)
-    return hh
+    await hh.finish_up()
+    hh.stop()
 
 asyncio.run(start_hh())

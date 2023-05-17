@@ -469,6 +469,12 @@ WorkToDo(
         #     return
         await self.hunting_task
 
+    async def finish_jobs(self):
+        while True:
+            if self.pending_cntr == 0 and not self.pending_jobs:
+                break
+            await asyncio.sleep(2)
+
 
 class WorkAnnouncingProtocol(asyncio.DatagramProtocol):
     """

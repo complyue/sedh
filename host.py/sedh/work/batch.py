@@ -42,4 +42,5 @@ async def manage_batch_jobs(
         async for ips in params():
             logger.debug(f"Dispatching job ips={ips!r}")
             await hh.dispatch_job(ips)
+        await hh.finish_jobs()
         logger.info("All jobs sent out.")

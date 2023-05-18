@@ -344,7 +344,7 @@ WorkToDo(
                     self.idle_workers.append(worker)
                     self.worker_available.set()
                 # XXX here
-                await self.result_ch.put((ips, result))
+                # await self.result_ch.put((ips, result))
                 return
             except Exception as exc:
                 jobExc = exc

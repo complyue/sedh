@@ -80,7 +80,10 @@ go for ips from jobCh do {
   case @doOneJob( **ips ) of {
     { result } -> {
       console.debug<| 'Computed result ' ++ result ++ ' for ips: ' ++ ips
-      peer.p2c( dataChan, repr( result ) )
+      # peer.p2c( dataChan, repr( result ) )
+      peer.postCommand( expr
+        SettleResult( {$ ips $}, {$ result['res'] $}, )
+      )
     }
     # in case it returned nil
     throw UsageError( 'Swarm job returned no result', ips=ips )
@@ -88,7 +91,10 @@ go for ips from jobCh do {
     console.error<| 'Swarm job [' ++ workDefinition ++ ' - '
     ++ senv.swarmManagerPid ++ '>' ++ senv.swarmWorkerPid ++ '] failure:\n'
     ++ jobExc
-    peer.p2c( errChan, desc( jobExc ) )
+    # peer.p2c( errChan, desc( jobExc ) )
+    peer.postCommand( expr
+      SettleResult( {$ ips $}, None, {$ repr( jobExc )$})
+    )
     break # stop processing more jobs
   }
 

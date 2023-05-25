@@ -94,6 +94,16 @@ class HeadHunter:
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
         self.headcount = effect("headcount")
+
+        # 将以下参数在 __init__ 中初始化
+        # 才能同时创建多个 `HeadHunter` 
+        self.swarmIface = effect("swarmIface", "0.0.0.0")
+        self.swarmAddr = effect("swarmAddr")
+        self.swarmPort = effect("swarmPort")
+        self.cfwInterval = effect("cfwInterval", 3)
+        # None，表示兼容旧版设置 senv.jobExecutable
+        self.jobExecutable = effect("jobExecutable",None)
+
         self.workModu = effect(workDefinition)
         self.shouldRetryJob = effect(shouldRetryJob)
 
@@ -202,7 +212,7 @@ class HeadHunter:
     async def _run(self):
         loop = asyncio.get_running_loop()
 
-        swarm_iface = effect("swarmIface", "0.0.0.0")
+        swarm_iface = self.swarmIface
 
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
@@ -226,8 +236,8 @@ class HeadHunter:
             # in case join() didn't throw, report this error
             raise RuntimeError("HeadHunter failed listening.")
 
-        swarm_addr = effect("swarmAddr", "127.0.0.1")
-        swarm_port = effect("swarmPort", 3722)
+        swarm_addr = self.swarmAddr
+        swarm_port = self.swarmPort
 
         # todo release cfw on cleanup.
         # but not urgent as long as HH runs in one-shot manner, the process is
@@ -240,8 +250,9 @@ class HeadHunter:
             allow_broadcast=True,
         )
 
-        cfw_interval = effect("cfw_interval", 3)
+        cfw_interval = self.cfwInterval
 
+        jobExecutable = self.jobExecutable or senv.jobExecutable
         while not self.all_finished():
             hc_employed = self.hc_employed
 
@@ -259,7 +270,7 @@ class HeadHunter:
                 pkt = f"""
 WorkToDo(
     {hc_demand!r},
-    {senv.jobExecutable!r},
+    {jobExecutable!r},
     {senv.jobWorkDir!r},
     {self.workModu!r},
     {self.priority!r},

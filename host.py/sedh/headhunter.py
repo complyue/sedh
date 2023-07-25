@@ -27,9 +27,7 @@ class Forager:
     )
 
     def __init__(
-        self,
-        peer: Peer,
-        pid: int,
+        self, peer: Peer, pid: int,
     ):
         self.peer = peer
         self.pid = pid
@@ -91,15 +89,25 @@ class HeadHunter:
     ):
         self.result_ch = result_ch or BChan()
         self.server_modu = server_modu
-        self.settle_result = settle_result
+        self._settle_result = settle_result
 
         # fetch effective configurations, cache as instance attribute
         self.priority = effect("priority")
         self.headcount = effect("headcount")
+
+        # 将以下参数在 __init__ 中初始化
+        # 才能同时创建多个 `HeadHunter` 
+        self.swarmIface = effect("swarmIface", "0.0.0.0")
+        self.swarmAddr = effect("swarmAddr")
+        self.swarmPort = effect("swarmPort")
+        self.cfwInterval = effect("cfwInterval", 3)
+        # None，表示兼容旧版设置 senv.jobExecutable
+        self.jobExecutable = effect("jobExecutable",None)
+
         self.workModu = effect(workDefinition)
         self.shouldRetryJob = effect(shouldRetryJob)
 
-        self.hc_employed = 0
+        self._hc_employed = 0
         self.foragers = {}
         self.idle_workers = []  # FILO queue
         self.worker_available = asyncio.Event()
@@ -112,6 +120,9 @@ class HeadHunter:
         self.finishing_up = asyncio.Event()
 
         self.net_server = None
+        
+    def settle_result(self, ips: dict, result: object = None, err_reason=None):
+        self._settle_result(ips, result, err_reason)
 
     def stop(self):
         server = self.net_server
@@ -162,9 +173,9 @@ class HeadHunter:
                 raise asyncio.CancelledError("HH done, no more worker to offer.")
             logger.debug("Got idle workers.")
 
-    async def release_idle_worker(self, worker: Worker):
-        self.idle_workers.append(worker)
-        self.worker_available.set()
+    # async def release_idle_worker(self, worker: Worker):
+    #     self.idle_workers.append(worker)
+    #     self.worker_available.set()
 
     # a swarm node connection identifying itself as a forager
     async def OfferHeads(self, forager_pid: int, max_hc: int):
@@ -194,13 +205,14 @@ class HeadHunter:
             f"Worker process pid={worker_pid} managed by {forager_pid} via {peer.ident} start working."
         )
         worker = Worker(peer, worker_pid, forager_pid)
+        logger.info(f"started worker {len(self.idle_workers)} - {worker.peer.ident}")
         self.idle_workers.append(worker)
         self.worker_available.set()
 
     async def _run(self):
         loop = asyncio.get_running_loop()
 
-        swarm_iface = effect("swarmIface", "0.0.0.0")
+        swarm_iface = self.swarmIface
 
         def swarm_conn_init(modu: Dict):
             modu["OfferHeads"] = self.OfferHeads
@@ -224,8 +236,8 @@ class HeadHunter:
             # in case join() didn't throw, report this error
             raise RuntimeError("HeadHunter failed listening.")
 
-        swarm_addr = effect("swarmAddr", "127.0.0.1")
-        swarm_port = effect("swarmPort", 3722)
+        swarm_addr = self.swarmAddr
+        swarm_port = self.swarmPort
 
         # todo release cfw on cleanup.
         # but not urgent as long as HH runs in one-shot manner, the process is
@@ -238,22 +250,16 @@ class HeadHunter:
             allow_broadcast=True,
         )
 
-        cfw_interval = effect("cfw_interval", 3)
+        cfw_interval = self.cfwInterval
 
-        while not self.finishing_up.is_set():
+        jobExecutable = self.jobExecutable or senv.jobExecutable
+        while not self.all_finished():
+            hc_employed = self.hc_employed
 
-            # calibrate self.hc_employed, wrt forager disconnection etc.
-            hc_employed = 0
-            for peer, forager in self.foragers.copy().items():
-                if peer.eol.done():
-                    del self.foragers[peer]  # forget about it
-                else:
-                    hc_employed += forager.hc_employed
-            if hc_employed != self.hc_employed:
-                logger.debug(f"HH has {hc_employed} heads employed now.")
-                self.hc_employed = hc_employed
+            logger.info(
+                f"headcount------------- hc={self.headcount}  employed={hc_employed}  idle={len(self.idle_workers)} pending={self.pending_cntr}+{len(self.pending_jobs)}"
+            )
 
-            logger.info(f"headcount-------------{self.headcount}  {hc_employed}  {len(self.idle_workers)}")
             hc_demand = self.headcount - hc_employed
             if hc_demand < 0:
                 pass  # TODO reduce employed headcounts gradually
@@ -264,7 +270,7 @@ class HeadHunter:
                 pkt = f"""
 WorkToDo(
     {hc_demand!r},
-    {senv.jobExecutable!r},
+    {jobExecutable!r},
     {senv.jobWorkDir!r},
     {self.workModu!r},
     {self.priority!r},
@@ -272,13 +278,24 @@ WorkToDo(
 """.encode()
                 cfw_trans.sendto(pkt, (swarm_addr, swarm_port))
 
-            await asyncio.wait(
-                [asyncio.sleep(cfw_interval), self.finishing_up.wait()],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            asyncio.create_task(self.submit_jobs())
 
-        while not self.all_finished():
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(cfw_interval)
+
+    @property
+    def hc_employed(self):
+        # calibrate self._hc_employed, wrt forager disconnection etc.
+        hc_employed = 0
+        for peer, forager in self.foragers.copy().items():
+            if peer.eol.done():
+                del self.foragers[peer]  # forget about it
+            else:
+                hc_employed += forager.hc_employed
+        if hc_employed != self._hc_employed:
+            logger.debug(f"HH has {hc_employed} heads employed now.")
+            self._hc_employed = hc_employed
+
+        return hc_employed
 
     async def track_job(self, worker: Worker, ips: Dict):
         peer = worker.peer
@@ -310,28 +327,35 @@ WorkToDo(
         #     timeout=timeout_,
 
         wait_task = asyncio.create_task(job_chan.get())
-        await peer.p2c(DATA_CHAN, repr(ips))
-        await asyncio.wait(
-            [wait_task, worker.err_task],
-            timeout=timeout_,
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        # anyway it's not pending now
-        self.pending_cntr -= 1
-        # capture any possible exception that has failed the job
         jobExc = None
+        try:
+            await peer.p2c(DATA_CHAN, repr(ips))
+            await asyncio.wait(
+                [wait_task, worker.err_task],
+                timeout=timeout_,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        except Exception as exc:
+            jobExc = exc
+
+        # capture any possible exception that has failed the job
         if wait_task.done():
             try:
-            #     wait_task.result()  # propagate any error ever occurred
-            #     return  # job done successfully
-            # except Exception as exc:
-            #     jobExc = exc
+                #     wait_task.result()  # propagate any error ever occurred
+                #     return  # job done successfully
+                # except Exception as exc:
+                #     jobExc = exc
                 result = wait_task.result()  # propagate any error ever occurred
-                # job done successfully
+                if result is EndOfStream:
+                    raise ValueError("result channel EndOfStream")
                 if worker.check_jobs_quota():
+                    logger.info(
+                        f"reusing worker {len(self.idle_workers)} - {worker.peer.ident} ips={ips} result={result}"
+                    )
                     self.idle_workers.append(worker)
                     self.worker_available.set()
-                await self.result_ch.put((ips, result))
+                # XXX here
+                # await self.result_ch.put((ips, result))
                 return
             except Exception as exc:
                 jobExc = exc
@@ -343,10 +367,10 @@ WorkToDo(
         # job_sink.publish(EndOfStream)
 
         # 将以下三个参数放入ips中
-        # timeout: 超时时间，单位:秒    
+        # timeout: 超时时间，单位:秒
         # retry_cnt: 重试次数
         # retry_maxN: 最大重试次数限制
-        
+
         if "retry_cnt" in ips and "retry_maxN" in ips:
             if ips["retry_cnt"] >= ips["retry_maxN"]:
                 logger.error(f"当前参数重跑次数已满，请检查参数正确性!  ips={ips}")
@@ -392,15 +416,21 @@ WorkToDo(
             while True:
                 if self.idle_workers:
                     worker = self.idle_workers.pop()
+                    logger.info(
+                        f"using idle worker {len(self.idle_workers)} - {worker.peer.ident}"
+                    )
                     logger.debug(f"Job assigned to {worker} - {ips}")
 
                     worker_ip = eval(worker.peer.ident)[0]
                     ips["worker_ip"] = worker_ip
-                    logger.debug(f"worker IP:  {worker_ip}")
+                    logger.info(f"worker IP:  {worker_ip}")
 
                     track_task = asyncio.create_task(self.track_job(worker, ips))
 
                     def track_done(fut: asyncio.Task):
+                        # anyway it's not pending now
+                        self.pending_cntr -= 1
+
                         if fut.cancelled():
                             return  # todo sth to do in this case?
                         trackExc = fut.exception()
@@ -433,7 +463,7 @@ WorkToDo(
         await self.submit_jobs()
 
     async def finish_up(self):
-        # self.finishing_up = True
+        # self.finishing_up.set()
         # while True:
         #     if self.all_finished():
         #         return
@@ -444,10 +474,17 @@ WorkToDo(
         #         await self.hunting_task
         #         return
         #     await asyncio.sleep(2)
+
         self.finishing_up.set()
-        if self.all_finished():
-            return
+        # if self.all_finished():
+        #     return
         await self.hunting_task
+
+    async def finish_jobs(self):
+        while True:
+            if self.pending_cntr == 0 and not self.pending_jobs:
+                break
+            await asyncio.sleep(2)
 
 
 class WorkAnnouncingProtocol(asyncio.DatagramProtocol):

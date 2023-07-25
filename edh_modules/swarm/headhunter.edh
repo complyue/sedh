@@ -102,7 +102,7 @@ export class HeadHunter {
     this.allReceived = Semaphore() # filled once all results received
 
     go {
-      perceive this.finishingUp { go { # eagerly check for finished once finishing up
+      perceive nil this.finishingUp { go { # eagerly check for finished once finishing up
           do break if this.allFinished() for _ from console.everyMillis(200)
       } }
 

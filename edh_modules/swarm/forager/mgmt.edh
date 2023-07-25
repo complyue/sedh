@@ -130,7 +130,7 @@ export class WSC {
 
   # this method meant to be run once per wsc
   method startTeamKeeper() go {
-    perceive this.stopped break # terminate this thread on stop signal
+    perceive nil this.stopped break # terminate this thread on stop signal
 
     # track delta of employment
     hcEmployed = 0
@@ -284,9 +284,7 @@ export class Forager {
         this.workerStartedCnt.inc() # count for one
       }
 
-      perceive this.stopped {
-        nil -> break # eos upon forager shutdown
-      }
+      perceive nil this.stopped break # eos upon forager shutdown
 
       while true { # for each worker process started, wait one exited
         # possible blocking intended, consume one from the counting semaphore

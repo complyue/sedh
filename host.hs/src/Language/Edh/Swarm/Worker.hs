@@ -152,45 +152,44 @@ wscTakeProc !peerClass (mandatoryArg -> !wscFd) = do
   !peerObj <- createArbiHostObjectM peerClass peer
   afterTxIO $ do
     void $
-      forkFinally (workerThread wscFd peerId pktSink poq wkrEoL) $
+      forkFinally (workerThread peerId pktSink poq wkrEoL) $
         \ !result -> atomically $ do
           !chs2Dispose <- readTVar disposalsVar
           sequence_ $ closeBChan <$> Set.toList chs2Dispose
           void $ tryPutTMVar wkrEoL result
   return $ EdhObject peerObj
-
-workerThread ::
-  Int ->
-  Text ->
-  TMVar Packet ->
-  TMVar Packet ->
-  TMVar (Either SomeException ()) ->
-  IO ()
-workerThread !wscFd !peerId !pktSink !poq !wkrEoL =
-  bracket (mkSocket $ fromIntegral wscFd) close $ \ !sock ->
-    try (netComm sock)
-      >>= (gracefulClose sock 5000 <*)
-        . atomically
-        . tryPutTMVar wkrEoL
   where
-    netComm :: Socket -> IO ()
-    netComm !sock = do
-      -- pump commands in,
-      -- make this thread the only one reading the handle
-      -- note this won't return, will be asynchronously killed on eol
-      void $ forkIO $ receivePacketStream peerId (recv sock) pktSink wkrEoL
+    workerThread ::
+      Text ->
+      TMVar Packet ->
+      TMVar Packet ->
+      TMVar (Either SomeException ()) ->
+      IO ()
+    workerThread !peerId !pktSink !poq !wkrEoL =
+      bracket (mkSocket $ fromIntegral wscFd) close $ \ !sock ->
+        try (netComm sock)
+          >>= (gracefulClose sock 5000 <*)
+            . atomically
+            . tryPutTMVar wkrEoL
+      where
+        netComm :: Socket -> IO ()
+        netComm !sock = do
+          -- pump commands in,
+          -- make this thread the only one reading the handle
+          -- note this won't return, will be asynchronously killed on eol
+          void $ forkIO $ receivePacketStream peerId (recv sock) pktSink wkrEoL
 
-      let serializeCmdsOut :: IO ()
-          serializeCmdsOut =
-            atomically
-              ((Right <$> takeTMVar poq) `orElse` (Left <$> readTMVar wkrEoL))
-              >>= \case
-                Left _ -> return ()
-                Right !pkt ->
-                  catch
-                    (sendPacket peerId (sendAll sock) pkt >> serializeCmdsOut)
-                    $ \(e :: SomeException) -> -- mark eol on error
-                      atomically $ void $ tryPutTMVar wkrEoL $ Left e
-      -- pump commands out,
-      -- make this thread the only one writing the handle
-      serializeCmdsOut
+          let serializeCmdsOut :: IO ()
+              serializeCmdsOut =
+                atomically
+                  ((Right <$> takeTMVar poq) `orElse` (Left <$> readTMVar wkrEoL))
+                  >>= \case
+                    Left _ -> return ()
+                    Right !pkt ->
+                      catch
+                        (sendPacket peerId (sendAll sock) pkt >> serializeCmdsOut)
+                        $ \(e :: SomeException) -> -- mark eol on error
+                          atomically $ void $ tryPutTMVar wkrEoL $ Left e
+          -- pump commands out,
+          -- make this thread the only one writing the handle
+          serializeCmdsOut

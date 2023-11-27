@@ -1,4 +1,5 @@
 
 import ( WebRepl, ** ) 'net/repl'
 
-export sedhDebug = WebRepl()
+# TODO WebRepl is not working well on compute nodes, where many processes run with it
+# export sedhDebug = WebRepl()

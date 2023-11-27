@@ -5,4 +5,8 @@ export {
   # Python) those don't have the intrinsic syntax
   method ArgsPack(*** apk ) apk
 
+  # Interpret boolean literals from Python
+  True = true
+  False = false
+
 }

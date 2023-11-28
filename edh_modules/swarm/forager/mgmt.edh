@@ -249,6 +249,21 @@ export class Forager {
     wsKey = repr( cfwAddr )
     console.debug<| 'Got call for ' ++hcPlanned++ ' worker(s), with currently '
     ++this.hcIdle.inv++ ' head(s) idle.'
+    if this.hcIdle.inv < 1 then {
+      console.debug<| 'All heads busy, teams: ' ++ '\n - \n'.join(*(()=<
+          do repr(wsc) for (_, wsc) from this.wsd
+      )) ++ '\n'
+
+      totalEmployed = 0
+      ai for (_, wsc: WSC) from this.wsd do {
+        totalEmployed += wsc.hcEmployed
+      }
+      if totalEmployed < this.headcount then {
+        this.hcIdle.put(this.headcount - totalEmployed)
+        console.warn<| 'Inaccurately tracked hdIdle, recalibrated to: '
+        ++ this.hcIdle.inv
+      }
+    }
     ai {
       case this.wsd[ wsKey ] of {
         { _ } -> pass # already been worked on TODO update info ?
@@ -332,7 +347,7 @@ export class Forager {
         this.lastPriority = wsc.priority
         hcEngaged = wsc.engage( hcDemand )
         if ( hcSpared = hcDemand - hcEngaged ) > 0 then {
-          this.hcIdle.inc(hcSpared)
+          this.hcIdle.inc(hcSpared) # TODO do this in a `finally` block?
         }
         continue
       }
@@ -348,7 +363,7 @@ export class Forager {
       this.lastPriority = wsc.priority
       hcEngaged = wsc.engage( hcBackIdle )
       if ( hcSpared = hcBackIdle - hcEngaged ) > 0 then {
-        this.hcIdle.inc(hcSpared)
+        this.hcIdle.inc(hcSpared) # TODO do this in a `finally` block?
       }
 
     }

@@ -20,7 +20,7 @@ dump_stacks_on_SIGQUIT()
 async def _run_():
     loop = asyncio.get_running_loop()
 
-    peer = await takeEdhFd(sedh.senv.wscFd())
+    peer = await takeSockFd(sedh.senv.wscFd())
 
     peer.ensure_channel(DATA_CHAN)
 

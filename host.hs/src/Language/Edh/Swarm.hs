@@ -61,10 +61,8 @@ installSwarmBatteries
 
     installModuleM_ "swarm/RT" $ do
       -- loosely depend on the @net@ runtime from nedh project
-      !peerClass <- getPeerClass
       exportM_ $ do
         defEdhProc'_ EdhMethod "killWorker" killWorkerProc
-        defEdhProc'_ EdhMethod "wscTake" $ wscTakeProc peerClass
         defEdhProc'_ EdhMethod "waitAnyWorkerDone" waitAnyWorkerDoneProc
         defEdhProc'_ EdhMethod "wscStartWorker" wscStartWorkerProc
 

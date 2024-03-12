@@ -45,7 +45,7 @@ senv =: namespace senv() {
 }
 
 # take the worksource connection file describer, make it a peer for comm
-peer = wscTake( senv.wscFd )
+peer = takeSockFd( senv.wscFd )
 peer =: Peer()
 console.debug<| 'Took worker connection to worksource: ' ++ peer
 defer {

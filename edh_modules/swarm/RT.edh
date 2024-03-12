@@ -26,12 +26,6 @@ export {
   method killWorker( workerPid ) pass
 
 
-  wscTake :: ( fd!int!Decimal ) -> Peer
-  {##
-   # Take a work-source connection by file-descriptor number
-   #}
-  method wscTake( wscFd ) pass
-
   waitAnyWorkerDone :: ()
   -> pid!int!Decimal:eg!'exited'
   || pid!int!Decimal:eg!'killed by <signal> with(out) core dumped'
